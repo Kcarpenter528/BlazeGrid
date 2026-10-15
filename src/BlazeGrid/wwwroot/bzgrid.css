@@ -1,32 +1,33 @@
-/* BlazeGrid — every visual is driven by the --bz-* variables below. Override them on .bz-grid,
+/* BlazeGrid — every visual is driven by the --bz-* variables below (their trailing comments feed the API docs). Override them on .bz-grid,
    on your own class (Class="my-grid") or via a theme (Theme="dark" → .bz-theme-dark). */
 
 .bz-grid {
-    --bz-font: 13px/1.3 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
-    --bz-bg: #ffffff;
-    --bz-fg: #1f2328;
-    --bz-muted: #6b7280;
-    --bz-border: #e5e7eb;
-    --bz-border-strong: #d1d5db;
-    --bz-header-bg: #f8fafc;
-    --bz-header-fg: #374151;
-    --bz-header-weight: 600;
-    --bz-row-alt: #fbfcfd;
-    --bz-row-hover: #f1f5fb;
-    --bz-selected: #e0ecff;
-    --bz-accent: #2563eb;
-    --bz-accent-fg: #ffffff;
-    --bz-group-bg: #f3f5f8;
-    --bz-group-fg: #111827;
-    --bz-lock-shadow: rgba(15, 23, 42, .12);
-    --bz-cell-px: 10px;
-    --bz-radius: 8px;
-    --bz-menu-bg: #ffffff;
-    --bz-menu-shadow: 0 10px 30px rgba(15, 23, 42, .18), 0 2px 6px rgba(15, 23, 42, .08);
-    --bz-loading-bg: rgba(255, 255, 255, .6);
-    --bz-input-bg: #ffffff;
-    --bz-error-bg: #fef2f2;
-    --bz-error-fg: #b91c1c;
+    --bz-font: 13px/1.3 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; /* Font shorthand for the whole grid (size/line-height and family). */
+    --bz-bg: #ffffff; /* Background of the grid and of data rows. */
+    --bz-fg: #1f2328; /* Main text color. */
+    --bz-muted: #6b7280; /* Secondary text: hints, counts, inactive icons. */
+    --bz-border: #e5e7eb; /* Row separators and light borders. */
+    --bz-border-strong: #d1d5db; /* Header underline, locked-column edges, input borders. */
+    --bz-header-bg: #f8fafc; /* Header, group panel and pager background. */
+    --bz-header-fg: #374151; /* Header text color. */
+    --bz-header-weight: 600; /* Header font weight. */
+    --bz-row-alt: #fbfcfd; /* Background of every other row (set equal to --bz-bg to turn striping off). */
+    --bz-row-hover: #f1f5fb; /* Row background on hover; also button hover states. */
+    --bz-selected: #e0ecff; /* Background of the selected row and of a row in edit mode. */
+    --bz-accent: #2563eb; /* Accent color: sort arrows, active filters, current page, focus rings. */
+    --bz-accent-fg: #ffffff; /* Text on accent-colored backgrounds. */
+    --bz-group-bg: #f3f5f8; /* Background of group header rows. */
+    --bz-group-fg: #111827; /* Text color of group header rows. */
+    --bz-footer-bg: var(--bz-header-bg); /* Background of the footer row (FooterTemplate). */
+    --bz-lock-shadow: rgba(15, 23, 42, .12); /* Shadow cast by locked columns over scrolled content (transparent to remove). */
+    --bz-cell-px: 10px; /* Horizontal cell padding. */
+    --bz-radius: 8px; /* Corner radius of the grid. */
+    --bz-menu-bg: #ffffff; /* Column menu and loading-pill background. */
+    --bz-menu-shadow: 0 10px 30px rgba(15, 23, 42, .18), 0 2px 6px rgba(15, 23, 42, .08); /* Column menu shadow. */
+    --bz-loading-bg: rgba(255, 255, 255, .6); /* Overlay color behind the loading indicator. */
+    --bz-input-bg: #ffffff; /* Background of editors, filter inputs and selects. */
+    --bz-error-bg: #fef2f2; /* Background of the edit error bar. */
+    --bz-error-fg: #b91c1c; /* Text color of the edit error bar. */
 
     position: relative;
     display: flex;
@@ -471,3 +472,22 @@
 .bz-oitem.bz-over { box-shadow: inset 0 2px 0 var(--bz-accent); }
 .bz-grip { color: var(--bz-muted); letter-spacing: -2px; }
 .bz-oval { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* ---------------------------------------------------------------- footer */
+
+.bz-footer {
+    --rbg: var(--bz-footer-bg, var(--bz-header-bg));
+    position: sticky;
+    bottom: 0;
+    z-index: 3;
+    display: grid;
+    grid-template-columns: var(--bz-cols);
+    width: var(--bz-tw);
+    min-width: 100%;
+    background: var(--rbg);
+    border-top: 1px solid var(--bz-border-strong);
+    font-weight: 600;
+}
+.bz-footer .bz-cell { border-bottom: 0; }
+.bz-footer .bz-lock { background: var(--rbg); }
+.bz-pbtn-more { color: var(--bz-muted); }

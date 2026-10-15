@@ -50,7 +50,9 @@
         Engine="_engine" PageSize="_pageSize" Theme="@ThemeName" ShowEditCommands="true"
         OnRenderStats="s => _stats = s" OnFilterChanged="FilterChanged" OnRowUpdated="RowUpdated"
         OnRowEditCommit="ValidateEdit" RowClass="RowCss">
-    <BzColumn Field="Id" Title="#" Locked="ColumnLock.Left" Editable="false" Format="N0" />
+    <BzColumn Field="Id" Title="#" Locked="ColumnLock.Left" Editable="false" Format="N0">
+        <FooterTemplate>@context.Count.ToString("N0") rows</FooterTemplate>
+    </BzColumn>
     <BzColumn Field="Customer" Locked="ColumnLock.Left" Filter="FilterKind.MultiSelect" />
     <BzColumn Field="Region" Filter="FilterKind.MultiSelect" />
     <BzColumn Field="Product" />

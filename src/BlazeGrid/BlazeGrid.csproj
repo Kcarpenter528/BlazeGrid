@@ -9,7 +9,9 @@
     <Version>0.1.1</Version>
     <Description>A high-performance virtualized data grid for Blazor WebAssembly with a Web Worker data engine.</Description>
     <PackageTags>blazor;grid;datagrid;wasm;virtualization</PackageTags>
-    <NoWarn>$(NoWarn);BL0005</NoWarn>
+    <!-- The XML doc file feeds IntelliSense and the API docs (tools/DocGen). CS1591: internals stay undocumented. -->
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <NoWarn>$(NoWarn);BL0005;CS1591</NoWarn>
   </PropertyGroup>
 
   <ItemGroup>

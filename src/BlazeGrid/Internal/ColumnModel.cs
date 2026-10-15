@@ -1,10 +1,14 @@
+using System.ComponentModel;
 using System.Net;
 using System.Text;
 using System.Text.RegularExpressions;
 
 namespace BlazeGrid.Internal;
 
-/// <summary>Runtime state of a column (definition + layout + render caches).</summary>
+/// <summary>
+/// A column at runtime: its <see cref="BzColumn{TItem}"/> definition plus the current layout. Get one from
+/// <c>BzGrid.FindColumn</c>, <c>Columns</c> or <c>VisibleColumns</c> and pass it to the grid's column methods.
+/// </summary>
 public sealed class ColumnModel<TItem>
 {
     internal ColumnModel(BzColumn<TItem> def, int engineIndex, bool isCommand = false)
@@ -32,45 +36,61 @@ public sealed class ColumnModel<TItem>
         ResetLayout();
     }
 
+    /// <summary>The column's declaration (its parameters).</summary>
     public BzColumn<TItem> Def { get; }
+    /// <summary>The key used in state, sorts, filters and groups: the Field, else the Title.</summary>
     public string Key { get; }
-    public int EngineIndex { get; }
-    public bool IsCommand { get; }
-    public bool Removed { get; internal set; }
-    public FieldAccessor<TItem>? Accessor { get; }
+    [EditorBrowsable(EditorBrowsableState.Never)] public int EngineIndex { get; }
+    [EditorBrowsable(EditorBrowsableState.Never)] public bool IsCommand { get; }
+    [EditorBrowsable(EditorBrowsableState.Never)] public bool Removed { get; internal set; }
+    [EditorBrowsable(EditorBrowsableState.Never)] public FieldAccessor<TItem>? Accessor { get; }
+    /// <summary>The filter kind in effect (Auto resolved from the property type).</summary>
     public FilterKind Kind { get; }
+    /// <summary>True for numeric, date and bool properties (they sort and filter as numbers).</summary>
     public bool IsNumeric { get; }
+    /// <summary>True for DateTime, DateTimeOffset and DateOnly properties.</summary>
     public bool IsDate { get; }
+    /// <summary>True for bool properties.</summary>
     public bool IsBool { get; }
+    /// <summary>True for enum properties.</summary>
     public bool IsEnum { get; }
-    public Type? EnumType { get; }
+    [EditorBrowsable(EditorBrowsableState.Never)] public Type? EnumType { get; }
 
     // layout state
+    /// <summary>Current width in pixels.</summary>
     public double Width { get; internal set; }
     /// <summary>True when width came from the column definition, persisted state or the user.</summary>
-    public bool WidthFixed { get; internal set; }
+    [EditorBrowsable(EditorBrowsableState.Never)] public bool WidthFixed { get; internal set; }
+    /// <summary>Current lock side.</summary>
     public ColumnLock Lock { get; internal set; }
+    /// <summary>Current display position.</summary>
     public int Order { get; internal set; }
+    /// <summary>Whether the column is currently shown.</summary>
     public bool Visible { get; internal set; }
 
     // render caches (rebuilt by the grid on layout change)
-    public int DisplayIndex { get; internal set; }
-    public string CellCss { get; internal set; } = "bz-cell";
-    public string? CellStyle { get; internal set; }
-    public string HeaderCss { get; internal set; } = "bz-hcell";
-    public string? HeaderStyle { get; internal set; }
+    [EditorBrowsable(EditorBrowsableState.Never)] public int DisplayIndex { get; internal set; }
+    [EditorBrowsable(EditorBrowsableState.Never)] public string CellCss { get; internal set; } = "bz-cell";
+    [EditorBrowsable(EditorBrowsableState.Never)] public string? CellStyle { get; internal set; }
+    [EditorBrowsable(EditorBrowsableState.Never)] public string HeaderCss { get; internal set; } = "bz-hcell";
+    [EditorBrowsable(EditorBrowsableState.Never)] public string? HeaderStyle { get; internal set; }
     internal TemplateSegment<TItem>[]? Html { get; }
 
+    /// <summary>Header text.</summary>
     public string Title => Def.Title ?? Def.Field ?? "";
-    public bool HasData => Accessor is not null || Def.DisplayText is not null;
+    [EditorBrowsable(EditorBrowsableState.Never)] public bool HasData => Accessor is not null || Def.DisplayText is not null;
+    /// <summary>The column can be sorted (Sortable and bound to data).</summary>
     public bool CanSort => !IsCommand && Def.Sortable && HasData;
+    /// <summary>The column can be filtered.</summary>
     public bool CanFilter => !IsCommand && Def.Filterable && HasData && Kind != FilterKind.None;
+    /// <summary>The column can be grouped by.</summary>
     public bool CanGroup => !IsCommand && Def.Groupable && HasData;
-    public bool CanReorder => !IsCommand && Def.Reorderable;
-    public bool CanResize => Def.Resizable;
+    [EditorBrowsable(EditorBrowsableState.Never)] public bool CanReorder => !IsCommand && Def.Reorderable;
+    [EditorBrowsable(EditorBrowsableState.Never)] public bool CanResize => Def.Resizable;
+    /// <summary>The column gets an editor in edit mode.</summary>
     public bool CanEdit => !IsCommand && Def.Editable != false
                            && ((Accessor?.CanWrite ?? false) || (Def.Editable == true && Def.EditTemplate is not null));
-    public bool HasMenu => !IsCommand;
+    [EditorBrowsable(EditorBrowsableState.Never)] public bool HasMenu => !IsCommand;
 
     internal void ResetLayout()
     {
@@ -81,15 +101,17 @@ public sealed class ColumnModel<TItem>
         Visible = Def.Visible;
     }
 
+    /// <summary>The cell's display text for an item (DisplayText or the formatted value).</summary>
     public string GetText(TItem item)
     {
         if (Def.DisplayText is not null) return Def.DisplayText(item) ?? "";
         return Accessor is null ? "" : TextFormat.Format(Accessor.Get(item), Def.Format, Def.FormatProvider);
     }
 
+    /// <summary>The raw property value for an item.</summary>
     public object? GetValue(TItem item) => Accessor?.Get(item);
 
-    public string RenderHtml(TItem item)
+    [EditorBrowsable(EditorBrowsableState.Never)] public string RenderHtml(TItem item)
     {
         var sb = new StringBuilder();
         foreach (var seg in Html!)

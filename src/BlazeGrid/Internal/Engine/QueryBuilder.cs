@@ -88,7 +88,7 @@ internal static class QueryBuilder
         return null;
     }
 
-    /// <param name="span">For dates, the width of one unit (a day) so "equals" means "on that day".</param>
+    // span: for dates, the width of one unit (a day) so "equals" means "on that day".
     private static EnginePredicate? Range(int c, CompareOperator op, double? a, double? b, double? span)
     {
         double s = span ?? 0;

@@ -19,9 +19,16 @@
             <div @key="@(row.Continued ? node.KeyContinued : node.KeyNormal)" class="@(node.Collapsed && !row.Continued ? "bz-row bz-grow bz-collapsed" : "bz-row bz-grow")" data-g="@i" role="row">
                 <div class="bz-gcell" style="padding-left:@(10 + node.Level * 20)px">
                     <span class="bz-gtoggle"></span>
-                    <span class="bz-gtitle">@node.Title:</span>
-                    <span class="bz-gkey">@(node.Text.Length == 0 ? "(Blank)" : node.Text)</span>
-                    <span class="bz-gcount">@node.Count.ToString("N0")</span>
+                    @if (g.FindColumn(node.Field)?.Def.GroupHeaderTemplate is { } groupTemplate)
+                    {
+                        @groupTemplate(new GroupHeaderContext { Field = node.Field, Title = node.Title, Text = node.Text, Count = node.Count, Level = node.Level, Continued = row.Continued })
+                    }
+                    else
+                    {
+                        <span class="bz-gtitle">@node.Title:</span>
+                        <span class="bz-gkey">@(node.Text.Length == 0 ? "(Blank)" : node.Text)</span>
+                        <span class="bz-gcount">@node.Count.ToString("N0")</span>
+                    }
                     @if (row.Continued)
                     {
                         <span class="bz-gcont">continued</span>

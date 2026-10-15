@@ -1,0 +1,2533 @@
+{
+  "product": "BlazeGrid",
+  "version": "0.1.1",
+  "generated": "2026-10-15",
+  "groups": [
+    {
+      "name": "Components",
+      "types": [
+        "BzGrid",
+        "BzColumn"
+      ]
+    },
+    {
+      "name": "Columns at runtime",
+      "types": [
+        "ColumnModel"
+      ]
+    },
+    {
+      "name": "Query & state",
+      "types": [
+        "ColumnFilter",
+        "SortDescriptor",
+        "GridQuery",
+        "GridState",
+        "ColumnState"
+      ]
+    },
+    {
+      "name": "Event arguments",
+      "types": [
+        "RowEventArgs",
+        "RowEditStartEventArgs",
+        "RowEditCommitEventArgs",
+        "CellChange",
+        "CellValueChangedEventArgs",
+        "FilterChangedEventArgs",
+        "GridRenderStats"
+      ]
+    },
+    {
+      "name": "Template contexts",
+      "types": [
+        "CellEditContext",
+        "GridFooterContext",
+        "GroupHeaderContext"
+      ]
+    },
+    {
+      "name": "Enums",
+      "types": [
+        "ColumnLock",
+        "ColumnAlign",
+        "FilterKind",
+        "TextOperator",
+        "CompareOperator",
+        "SortDirection",
+        "DataEngineMode",
+        "EditTrigger"
+      ]
+    }
+  ],
+  "types": {
+    "BzGrid": {
+      "name": "BzGrid",
+      "display": "BzGrid<TItem>",
+      "kind": "component",
+      "namespace": "BlazeGrid",
+      "base": "ComponentBase",
+      "summary": "A virtualized data grid. Only the rows in view exist in the DOM, so it stays fast with hundreds of thousands of rows. Declare columns with <a href=\"#/api/BzColumn\"><code>BzColumn</code></a> inside it.",
+      "remarks": "Filtering, sorting and grouping run in .NET or in a background Web Worker (see <a href=\"#/api/BzGrid/Engine\"><code>Engine</code></a>). With none of them active, new data goes straight to rendering. Scrolling re-renders only the body, and column widths live in CSS variables, so resizing never re-renders cells.",
+      "example": "<pre><code class=\"language-razor\">&lt;BzGrid TItem=&quot;Order&quot; Items=&quot;orders&quot; Height=&quot;600px&quot; PageSize=&quot;100&quot; StateKey=&quot;orders&quot;&gt;\n    &lt;BzColumn Field=&quot;Id&quot; Title=&quot;#&quot; Locked=&quot;ColumnLock.Left&quot; /&gt;\n    &lt;BzColumn Field=&quot;Customer&quot; Filter=&quot;FilterKind.MultiSelect&quot; /&gt;\n    &lt;BzColumn Field=&quot;OrderDate&quot; Format=&quot;yyyy-MM-dd&quot; /&gt;\n    &lt;BzColumn Field=&quot;Amount&quot; Format=&quot;C2&quot; /&gt;\n&lt;/BzGrid&gt;</code></pre>",
+      "members": [
+        {
+          "name": "ChildContent",
+          "kind": "param",
+          "category": "Data",
+          "type": "RenderFragment?",
+          "summary": "The <a href=\"#/api/BzColumn\"><code>BzColumn</code></a> declarations. Columns render nothing themselves."
+        },
+        {
+          "name": "Items",
+          "kind": "param",
+          "category": "Data",
+          "type": "IReadOnlyList<TItem>?",
+          "summary": "The rows to display. Replace the list instance to load new data, or call <a href=\"#/api/BzGrid/RefreshAsync\"><code>RefreshAsync</code></a> after changing the same list in place.",
+          "remarks": "With no filter, sort or group active, new data goes straight to rendering: the query engine is not touched."
+        },
+        {
+          "name": "Engine",
+          "kind": "param",
+          "category": "Data",
+          "type": "DataEngineMode",
+          "default": "DataEngineMode.Auto",
+          "summary": "Where filtering, sorting and grouping are computed. <code>Auto</code> uses .NET for small data and a background Web Worker from <a href=\"#/api/BzGrid/WorkerThreshold\"><code>WorkerThreshold</code></a> rows up."
+        },
+        {
+          "name": "WorkerThreshold",
+          "kind": "param",
+          "category": "Data",
+          "type": "int",
+          "default": "20000",
+          "summary": "Row count at which <a href=\"#/api/DataEngineMode/Auto\"><code>DataEngineMode.Auto</code></a> switches to the Web Worker engine."
+        },
+        {
+          "name": "RowHeight",
+          "kind": "param",
+          "category": "Layout & appearance",
+          "type": "int",
+          "default": "34",
+          "summary": "Fixed height of every row in pixels. Virtualization relies on rows all being this height."
+        },
+        {
+          "name": "Height",
+          "kind": "param",
+          "category": "Layout & appearance",
+          "type": "string",
+          "default": "\"520px\"",
+          "summary": "CSS height of the grid, e.g. <code>&quot;600px&quot;</code> or <code>&quot;calc(100vh - 200px)&quot;</code>. The body scrolls inside it."
+        },
+        {
+          "name": "Class",
+          "kind": "param",
+          "category": "Layout & appearance",
+          "type": "string?",
+          "default": "null",
+          "summary": "Extra CSS class(es) on the grid's root element. The usual hook for a custom theme."
+        },
+        {
+          "name": "Style",
+          "kind": "param",
+          "category": "Layout & appearance",
+          "type": "string?",
+          "default": "null",
+          "summary": "Inline style on the root element. Handy for overriding a few <code>--bz-*</code> variables."
+        },
+        {
+          "name": "Theme",
+          "kind": "param",
+          "category": "Layout & appearance",
+          "type": "string?",
+          "default": "null",
+          "summary": "Adds the class <code>bz-theme-{Theme}</code>. Built in: <code>&quot;dark&quot;</code> and <code>&quot;compact&quot;</code>."
+        },
+        {
+          "name": "RowClass",
+          "kind": "param",
+          "category": "Layout & appearance",
+          "type": "Func<TItem, string?>?",
+          "summary": "Returns extra CSS class(es) for a row, or null.",
+          "example": "<pre><code class=\"language-razor\">RowClass=&quot;@(o =&gt; o.Status == &quot;Cancelled&quot; ? &quot;row-cancelled&quot; : null)&quot;</code></pre>"
+        },
+        {
+          "name": "Overscan",
+          "kind": "param",
+          "category": "Layout & appearance",
+          "type": "int",
+          "default": "10",
+          "summary": "Rows rendered above and below the visible window, to keep fast scrolling smooth."
+        },
+        {
+          "name": "EmptyTemplate",
+          "kind": "param",
+          "category": "Layout & appearance",
+          "type": "RenderFragment?",
+          "summary": "Content shown when there are no rows to display. Defaults to &quot;No records to display&quot;."
+        },
+        {
+          "name": "Loading",
+          "kind": "param",
+          "category": "Loading",
+          "type": "bool",
+          "default": "false",
+          "summary": "Shows the loading overlay. The grid also shows it on its own when a filter, sort or group query takes over 120 ms."
+        },
+        {
+          "name": "LoadingText",
+          "kind": "param",
+          "category": "Loading",
+          "type": "string",
+          "default": "\"Loading…\"",
+          "summary": "Text of the default loading indicator."
+        },
+        {
+          "name": "LoadingClass",
+          "kind": "param",
+          "category": "Loading",
+          "type": "string?",
+          "default": "null",
+          "summary": "Extra CSS class on the loading overlay."
+        },
+        {
+          "name": "LoadingTemplate",
+          "kind": "param",
+          "category": "Loading",
+          "type": "RenderFragment?",
+          "summary": "Replaces the default spinner and text inside the loading overlay."
+        },
+        {
+          "name": "PageSize",
+          "kind": "param",
+          "category": "Paging",
+          "type": "int",
+          "default": "0",
+          "summary": "Rows per page. <code>0</code> turns paging off: all rows scroll in one virtualized list."
+        },
+        {
+          "name": "PageSizeOptions",
+          "kind": "param",
+          "category": "Paging",
+          "type": "int[]",
+          "default": "{ 25, 50, 100, 250, 1000 }",
+          "summary": "Choices offered by the pager's page-size selector."
+        },
+        {
+          "name": "PagerButtonCount",
+          "kind": "param",
+          "category": "Paging",
+          "type": "int",
+          "default": "5",
+          "summary": "Numbered page buttons shown in the pager. Pages are shown in fixed blocks (1-10, 11-20, …)."
+        },
+        {
+          "name": "ShowPageSizeSelector",
+          "kind": "param",
+          "category": "Paging",
+          "type": "bool",
+          "default": "true",
+          "summary": "Shows the page-size selector in the pager."
+        },
+        {
+          "name": "ShowGroupPanel",
+          "kind": "param",
+          "category": "Grouping",
+          "type": "bool",
+          "default": "true",
+          "summary": "Shows the panel above the header where columns are dropped to group by them."
+        },
+        {
+          "name": "GroupsCollapsedByDefault",
+          "kind": "param",
+          "category": "Grouping",
+          "type": "bool",
+          "default": "false",
+          "summary": "Starts every group collapsed."
+        },
+        {
+          "name": "StateKey",
+          "kind": "param",
+          "category": "State",
+          "type": "string?",
+          "default": "null",
+          "summary": "Persists the layout to localStorage under this key: column order, width, lock and visibility, sorts, filters, groups, group value orders and page size. Null disables persistence."
+        },
+        {
+          "name": "ServerMode",
+          "kind": "param",
+          "category": "Server-side data",
+          "type": "bool",
+          "default": "false",
+          "summary": "The grid stops filtering, sorting and paging locally. Handle <a href=\"#/api/BzGrid/OnQueryChanged\"><code>OnQueryChanged</code></a>, fetch the requested page, then set <a href=\"#/api/BzGrid/Items\"><code>Items</code></a> and <a href=\"#/api/BzGrid/TotalCount\"><code>TotalCount</code></a>. Grouping is still applied to the received page."
+        },
+        {
+          "name": "TotalCount",
+          "kind": "param",
+          "category": "Server-side data",
+          "type": "int?",
+          "default": "null",
+          "summary": "Server mode: the total row count across all pages, used by the pager."
+        },
+        {
+          "name": "FilterOptionsProvider",
+          "kind": "param",
+          "category": "Server-side data",
+          "type": "Func<string, Task<IEnumerable<string>>>?",
+          "summary": "Server mode: returns the values offered by a multi-select filter, given the column's field."
+        },
+        {
+          "name": "SelectedItem",
+          "kind": "param",
+          "category": "Selection",
+          "type": "TItem?",
+          "summary": "The highlighted row. Supports <code>@bind-SelectedItem</code>."
+        },
+        {
+          "name": "EditTrigger",
+          "kind": "param",
+          "category": "Editing",
+          "type": "EditTrigger",
+          "default": "EditTrigger.DoubleClick",
+          "summary": "What opens a row for inline editing. <code>None</code> leaves it to <a href=\"#/api/BzGrid/BeginEditAsync\"><code>BeginEditAsync</code></a> or the edit command."
+        },
+        {
+          "name": "ShowEditCommands",
+          "kind": "param",
+          "category": "Editing",
+          "type": "bool",
+          "default": "false",
+          "summary": "Adds a right-locked column with edit, save and cancel buttons."
+        },
+        {
+          "name": "OnQueryChanged",
+          "kind": "event",
+          "category": "Events",
+          "type": "EventCallback<GridQuery>",
+          "summary": "Raised when filters, sorts, groups, the page or the page size change. In <a href=\"#/api/BzGrid/ServerMode\"><code>ServerMode</code></a> this is where you fetch data; <a href=\"#/api/GridQuery/Reason\"><code>GridQuery.Reason</code></a> says what changed."
+        },
+        {
+          "name": "OnFilterChanged",
+          "kind": "event",
+          "category": "Events",
+          "type": "EventCallback<FilterChangedEventArgs>",
+          "summary": "Raised when a column filter is set or cleared, in both local and server mode."
+        },
+        {
+          "name": "OnStateChanged",
+          "kind": "event",
+          "category": "Events",
+          "type": "EventCallback<GridState>",
+          "summary": "Raised whenever the persistable layout changes, with the new <a href=\"#/api/GridState\"><code>GridState</code></a>."
+        },
+        {
+          "name": "OnRenderStats",
+          "kind": "event",
+          "category": "Events",
+          "type": "EventCallback<GridRenderStats>",
+          "summary": "Raised after new data is painted, with timings. Useful for benchmarking."
+        },
+        {
+          "name": "SelectedItemChanged",
+          "kind": "event",
+          "category": "Events",
+          "type": "EventCallback<TItem>",
+          "summary": "Raised when the selected row changes (the other half of <code>@bind-SelectedItem</code>)."
+        },
+        {
+          "name": "OnRowClick",
+          "kind": "event",
+          "category": "Events",
+          "type": "EventCallback<RowEventArgs<TItem>>",
+          "summary": "Raised when a data row is clicked."
+        },
+        {
+          "name": "OnRowDoubleClick",
+          "kind": "event",
+          "category": "Events",
+          "type": "EventCallback<RowEventArgs<TItem>>",
+          "summary": "Raised when a data row is double-clicked, before edit mode starts."
+        },
+        {
+          "name": "OnRowEditStart",
+          "kind": "event",
+          "category": "Events",
+          "type": "EventCallback<RowEditStartEventArgs<TItem>>",
+          "summary": "Raised before a row enters edit mode. Set <a href=\"#/api/RowEditStartEventArgs/Cancel\"><code>RowEditStartEventArgs.Cancel</code></a> to prevent it."
+        },
+        {
+          "name": "OnCellValueChanged",
+          "kind": "event",
+          "category": "Events",
+          "type": "EventCallback<CellValueChangedEventArgs<TItem>>",
+          "summary": "Raised while editing whenever an editor's value changes (nothing is written to the item yet)."
+        },
+        {
+          "name": "OnRowEditCommit",
+          "kind": "event",
+          "category": "Events",
+          "type": "EventCallback<RowEditCommitEventArgs<TItem>>",
+          "summary": "Raised before changes are written to the item. Set <a href=\"#/api/RowEditCommitEventArgs/Cancel\"><code>RowEditCommitEventArgs.Cancel</code></a> and <a href=\"#/api/RowEditCommitEventArgs/Error\"><code>RowEditCommitEventArgs.Error</code></a> to keep the row in edit mode, e.g. when validation fails."
+        },
+        {
+          "name": "OnRowUpdated",
+          "kind": "event",
+          "category": "Events",
+          "type": "EventCallback<RowEditCommitEventArgs<TItem>>",
+          "summary": "Raised after changes were written to the item: a good place to call your API. Columns bound to read-only (computed) properties are not written by the grid; apply those changes here."
+        },
+        {
+          "name": "OnRowEditCancel",
+          "kind": "event",
+          "category": "Events",
+          "type": "EventCallback<TItem>",
+          "summary": "Raised when an edit is cancelled (Esc or the cancel button)."
+        },
+        {
+          "name": "VisibleColumns",
+          "kind": "property",
+          "category": "Read-only state",
+          "type": "IReadOnlyList<ColumnModel<TItem>>",
+          "access": "get",
+          "summary": "The visible columns in display order (locked left, scrolling, locked right)."
+        },
+        {
+          "name": "Columns",
+          "kind": "property",
+          "category": "Read-only state",
+          "type": "IReadOnlyList<ColumnModel<TItem>>",
+          "access": "get",
+          "summary": "All registered columns, including hidden ones, in declaration order."
+        },
+        {
+          "name": "IsLoading",
+          "kind": "property",
+          "category": "Read-only state",
+          "type": "bool",
+          "default": "false",
+          "access": "get",
+          "summary": "True while the loading overlay is shown (<a href=\"#/api/BzGrid/Loading\"><code>Loading</code></a>, or a query running over 120 ms)."
+        },
+        {
+          "name": "EditError",
+          "kind": "property",
+          "category": "Read-only state",
+          "type": "string?",
+          "default": "null",
+          "access": "get",
+          "summary": "The message shown above the grid when an edit was rejected, or null."
+        },
+        {
+          "name": "EngineName",
+          "kind": "property",
+          "category": "Read-only state",
+          "type": "string",
+          "default": "\"none\"",
+          "access": "get",
+          "summary": "The engine currently computing queries: &quot;managed&quot;, &quot;worker&quot; or &quot;none&quot;."
+        },
+        {
+          "name": "FilteredCount",
+          "kind": "property",
+          "category": "Read-only state",
+          "type": "int",
+          "default": "0",
+          "access": "get",
+          "summary": "Data rows after filtering (all pages)."
+        },
+        {
+          "name": "PageIndex",
+          "kind": "property",
+          "category": "Read-only state",
+          "type": "int",
+          "default": "0",
+          "access": "get",
+          "summary": "The zero-based current page."
+        },
+        {
+          "name": "CurrentPageSize",
+          "kind": "property",
+          "category": "Read-only state",
+          "type": "int",
+          "default": "0",
+          "access": "get",
+          "summary": "The current page size (0 when paging is off). May differ from <a href=\"#/api/BzGrid/PageSize\"><code>PageSize</code></a> once the user picks another."
+        },
+        {
+          "name": "HasGroups",
+          "kind": "property",
+          "category": "Read-only state",
+          "type": "bool",
+          "default": "false",
+          "access": "get",
+          "summary": "True when at least one grouping is active."
+        },
+        {
+          "name": "CurrentPageRowCount",
+          "kind": "property",
+          "category": "Read-only state",
+          "type": "int",
+          "default": "0",
+          "access": "get",
+          "summary": "Data rows on the current page."
+        },
+        {
+          "name": "PageCount",
+          "kind": "property",
+          "category": "Properties",
+          "type": "int",
+          "default": "1",
+          "access": "get",
+          "summary": "Number of pages (1 when paging is off)."
+        },
+        {
+          "name": "TotalItemCount",
+          "kind": "property",
+          "category": "Read-only state",
+          "type": "int",
+          "default": "0",
+          "access": "get",
+          "summary": "Total data rows across all pages: <a href=\"#/api/BzGrid/TotalCount\"><code>TotalCount</code></a> in server mode, else the filtered count."
+        },
+        {
+          "name": "Groups",
+          "kind": "property",
+          "category": "Properties",
+          "type": "IReadOnlyList<SortDescriptor>",
+          "access": "get",
+          "summary": "Active groupings, outermost first."
+        },
+        {
+          "name": "Sorts",
+          "kind": "property",
+          "category": "Properties",
+          "type": "IReadOnlyList<SortDescriptor>",
+          "access": "get",
+          "summary": "Active sorts, highest priority first."
+        },
+        {
+          "name": "Filters",
+          "kind": "property",
+          "category": "Properties",
+          "type": "IReadOnlyCollection<ColumnFilter>",
+          "access": "get",
+          "summary": "Active column filters."
+        },
+        {
+          "name": "FindColumn",
+          "kind": "method",
+          "category": "Columns",
+          "type": "ColumnModel<TItem>?",
+          "signature": "ColumnModel<TItem>? FindColumn(string key)",
+          "summary": "Finds a column by key (its <a href=\"#/api/BzColumn/Field\"><code>BzColumn.Field</code></a>, else its Title). Most methods that act on a column take the <a href=\"#/api/ColumnModel\"><code>ColumnModel</code></a> returned here.",
+          "example": "<pre><code class=\"language-csharp\">await grid.SetSortAsync(grid.FindColumn(&quot;OrderDate&quot;)!, SortDirection.Descending);</code></pre>",
+          "params": [
+            {
+              "name": "key",
+              "type": "string"
+            }
+          ]
+        },
+        {
+          "name": "RefreshAsync",
+          "kind": "method",
+          "category": "Data",
+          "type": "Task",
+          "signature": "Task RefreshAsync()",
+          "summary": "Re-reads the current <a href=\"#/api/BzGrid/Items\"><code>Items</code></a>, e.g. after adding or removing rows in the same list instance."
+        },
+        {
+          "name": "SetSortAsync",
+          "kind": "method",
+          "category": "Sorting & filtering",
+          "type": "Task",
+          "signature": "Task SetSortAsync(ColumnModel<TItem> col, SortDirection? direction, bool append = false)",
+          "summary": "Sorts by a column. Users do the same by clicking a header (Shift+click adds a sort).",
+          "params": [
+            {
+              "name": "col",
+              "type": "ColumnModel<TItem>",
+              "summary": "The column, from <a href=\"#/api/BzGrid/FindColumn\"><code>FindColumn</code></a>."
+            },
+            {
+              "name": "direction",
+              "type": "SortDirection?",
+              "summary": "The direction, or null to remove this column's sort."
+            },
+            {
+              "name": "append",
+              "type": "bool",
+              "default": "false",
+              "summary": "Keep the other sorts and add (or update) this one, instead of replacing them."
+            }
+          ]
+        },
+        {
+          "name": "SetFilterAsync",
+          "kind": "method",
+          "category": "Sorting & filtering",
+          "type": "Task",
+          "signature": "Task SetFilterAsync(ColumnModel<TItem> col, ColumnFilter? filter)",
+          "summary": "Sets or clears a column's filter.",
+          "example": "<pre><code class=\"language-csharp\">await grid.SetFilterAsync(grid.FindColumn(&quot;Status&quot;)!, new ColumnFilter\n{\n    Kind = FilterKind.MultiSelect,\n    Values = new() { &quot;New&quot;, &quot;Processing&quot; }\n});</code></pre>",
+          "params": [
+            {
+              "name": "col",
+              "type": "ColumnModel<TItem>",
+              "summary": "The column, from <a href=\"#/api/BzGrid/FindColumn\"><code>FindColumn</code></a>."
+            },
+            {
+              "name": "filter",
+              "type": "ColumnFilter?",
+              "summary": "The filter, or null (or an inactive filter) to clear it. <a href=\"#/api/ColumnFilter/Field\"><code>ColumnFilter.Field</code></a> is filled in for you."
+            }
+          ]
+        },
+        {
+          "name": "ClearFiltersAsync",
+          "kind": "method",
+          "category": "Sorting & filtering",
+          "type": "Task",
+          "signature": "Task ClearFiltersAsync()",
+          "summary": "Removes every column filter."
+        },
+        {
+          "name": "GroupByAsync",
+          "kind": "method",
+          "category": "Grouping",
+          "type": "Task",
+          "signature": "Task GroupByAsync(ColumnModel<TItem> col, int index = -1)",
+          "summary": "Groups by a column. Ignored if the column is not groupable or already grouped.",
+          "params": [
+            {
+              "name": "col",
+              "type": "ColumnModel<TItem>",
+              "summary": "The column, from <a href=\"#/api/BzGrid/FindColumn\"><code>FindColumn</code></a>."
+            },
+            {
+              "name": "index",
+              "type": "int",
+              "default": "-1",
+              "summary": "Position among the groupings (0 = outermost); -1 adds it innermost."
+            }
+          ]
+        },
+        {
+          "name": "UngroupAsync",
+          "kind": "method",
+          "category": "Grouping",
+          "type": "Task",
+          "signature": "Task UngroupAsync(string field)",
+          "summary": "Removes the grouping on a column key.",
+          "params": [
+            {
+              "name": "field",
+              "type": "string"
+            }
+          ]
+        },
+        {
+          "name": "ToggleGroupDirectionAsync",
+          "kind": "method",
+          "category": "Grouping",
+          "type": "Task",
+          "signature": "Task ToggleGroupDirectionAsync(string field)",
+          "summary": "Flips a grouping between ascending and descending.",
+          "params": [
+            {
+              "name": "field",
+              "type": "string"
+            }
+          ]
+        },
+        {
+          "name": "MoveGroupAsync",
+          "kind": "method",
+          "category": "Grouping",
+          "type": "Task",
+          "signature": "Task MoveGroupAsync(string field, int delta)",
+          "summary": "Moves a grouping outward (negative <code>delta</code>) or inward (positive).",
+          "params": [
+            {
+              "name": "field",
+              "type": "string"
+            },
+            {
+              "name": "delta",
+              "type": "int"
+            }
+          ]
+        },
+        {
+          "name": "SetAllGroupsCollapsed",
+          "kind": "method",
+          "category": "Grouping",
+          "type": "void",
+          "signature": "void SetAllGroupsCollapsed(bool collapsed)",
+          "summary": "Expands or collapses every group.",
+          "params": [
+            {
+              "name": "collapsed",
+              "type": "bool"
+            }
+          ]
+        },
+        {
+          "name": "EffectiveGroupOrder",
+          "kind": "method",
+          "category": "Grouping",
+          "type": "IReadOnlyList<string>?",
+          "signature": "IReadOnlyList<string>? EffectiveGroupOrder(ColumnModel<TItem> col)",
+          "summary": "The explicit order of group values for a column: the user's order from the menu, else the column's GroupOrder.",
+          "params": [
+            {
+              "name": "col",
+              "type": "ColumnModel<TItem>"
+            }
+          ]
+        },
+        {
+          "name": "SetGroupOrderAsync",
+          "kind": "method",
+          "category": "Grouping",
+          "type": "Task",
+          "signature": "Task SetGroupOrderAsync(ColumnModel<TItem> col, IReadOnlyList<string>? order)",
+          "summary": "Sets (or with null, clears) the user-defined group value order for a column.",
+          "params": [
+            {
+              "name": "col",
+              "type": "ColumnModel<TItem>"
+            },
+            {
+              "name": "order",
+              "type": "IReadOnlyList<string>?"
+            }
+          ]
+        },
+        {
+          "name": "SetLockAsync",
+          "kind": "method",
+          "category": "Columns",
+          "type": "Task",
+          "signature": "Task SetLockAsync(ColumnModel<TItem> col, ColumnLock lockSide)",
+          "summary": "Locks a column to the left or right edge, or unlocks it.",
+          "params": [
+            {
+              "name": "col",
+              "type": "ColumnModel<TItem>"
+            },
+            {
+              "name": "lockSide",
+              "type": "ColumnLock"
+            }
+          ]
+        },
+        {
+          "name": "SetVisible",
+          "kind": "method",
+          "category": "Columns",
+          "type": "void",
+          "signature": "void SetVisible(ColumnModel<TItem> col, bool visible)",
+          "summary": "Shows or hides a column.",
+          "params": [
+            {
+              "name": "col",
+              "type": "ColumnModel<TItem>"
+            },
+            {
+              "name": "visible",
+              "type": "bool"
+            }
+          ]
+        },
+        {
+          "name": "ShowAllColumns",
+          "kind": "method",
+          "category": "Columns",
+          "type": "void",
+          "signature": "void ShowAllColumns()",
+          "summary": "Makes every column visible."
+        },
+        {
+          "name": "AutoFitAsync",
+          "kind": "method",
+          "category": "Columns",
+          "type": "Task",
+          "signature": "Task AutoFitAsync(ColumnModel<TItem>? col = null)",
+          "summary": "Sizes a column (or, with null, every column) to fit its header and a sample of its data.",
+          "params": [
+            {
+              "name": "col",
+              "type": "ColumnModel<TItem>?",
+              "default": "null"
+            }
+          ]
+        },
+        {
+          "name": "SetPageAsync",
+          "kind": "method",
+          "category": "Paging",
+          "type": "Task",
+          "signature": "Task SetPageAsync(int page)",
+          "summary": "Goes to a zero-based page (clamped to the valid range).",
+          "params": [
+            {
+              "name": "page",
+              "type": "int"
+            }
+          ]
+        },
+        {
+          "name": "SetPageSizeAsync",
+          "kind": "method",
+          "category": "Paging",
+          "type": "Task",
+          "signature": "Task SetPageSizeAsync(int size)",
+          "summary": "Changes the page size (0 turns paging off) and returns to the first page.",
+          "params": [
+            {
+              "name": "size",
+              "type": "int"
+            }
+          ]
+        },
+        {
+          "name": "CurrentQuery",
+          "kind": "method",
+          "category": "Sorting & filtering",
+          "type": "GridQuery",
+          "signature": "GridQuery CurrentQuery(string reason = \"\")",
+          "summary": "A snapshot of the current filters, sorts, groups and page, e.g. to send to an API.",
+          "params": [
+            {
+              "name": "reason",
+              "type": "string",
+              "default": "\"\""
+            }
+          ]
+        },
+        {
+          "name": "BeginEditAsync",
+          "kind": "method",
+          "category": "Editing",
+          "type": "Task",
+          "signature": "Task BeginEditAsync(TItem item)",
+          "summary": "Puts the row showing <code>item</code> into edit mode (any row being edited is committed first).",
+          "params": [
+            {
+              "name": "item",
+              "type": "TItem"
+            }
+          ]
+        },
+        {
+          "name": "CommitEditAsync",
+          "kind": "method",
+          "category": "Editing",
+          "type": "Task<bool>",
+          "signature": "Task<bool> CommitEditAsync()",
+          "summary": "Saves the row being edited, raising <a href=\"#/api/BzGrid/OnRowEditCommit\"><code>OnRowEditCommit</code></a> then <a href=\"#/api/BzGrid/OnRowUpdated\"><code>OnRowUpdated</code></a>.",
+          "returns": "False if the commit was cancelled or a value could not be converted; the row stays in edit mode."
+        },
+        {
+          "name": "CancelEditAsync",
+          "kind": "method",
+          "category": "Editing",
+          "type": "Task",
+          "signature": "Task CancelEditAsync()",
+          "summary": "Discards the row being edited."
+        },
+        {
+          "name": "GetState",
+          "kind": "method",
+          "category": "State",
+          "type": "GridState",
+          "signature": "GridState GetState()",
+          "summary": "The current persistable layout. Serialize it to save layouts server-side."
+        },
+        {
+          "name": "SetStateAsync",
+          "kind": "method",
+          "category": "State",
+          "type": "Task",
+          "signature": "Task SetStateAsync(GridState state)",
+          "summary": "Applies a layout previously returned by <a href=\"#/api/BzGrid/GetState\"><code>GetState</code></a>. Entries for unknown columns are ignored.",
+          "params": [
+            {
+              "name": "state",
+              "type": "GridState"
+            }
+          ]
+        },
+        {
+          "name": "ResetStateAsync",
+          "kind": "method",
+          "category": "State",
+          "type": "Task",
+          "signature": "Task ResetStateAsync()",
+          "summary": "Clears persisted state and restores the defaults from the column definitions."
+        }
+      ]
+    },
+    "BzColumn": {
+      "name": "BzColumn",
+      "display": "BzColumn<TItem>",
+      "kind": "component",
+      "namespace": "BlazeGrid",
+      "base": "ComponentBase",
+      "summary": "Declares a column of a <a href=\"#/api/BzGrid\"><code>BzGrid</code></a>. Place it inside the grid; it renders nothing itself.",
+      "remarks": "Parameters are read once, when the column registers with the grid. Changing a parameter afterwards (for example <a href=\"#/api/BzColumn/Title\"><code>Title</code></a>) is not picked up yet; use <code>@key</code> on the grid to rebuild it if you need to.",
+      "example": "<pre><code class=\"language-razor\">&lt;BzColumn Field=&quot;Customer.Name&quot; Title=&quot;Customer&quot; Filter=&quot;FilterKind.MultiSelect&quot; Width=&quot;180&quot; /&gt;\n&lt;BzColumn Field=&quot;Amount&quot; Format=&quot;C2&quot; Locked=&quot;ColumnLock.Right&quot; /&gt;</code></pre>",
+      "members": [
+        {
+          "name": "Field",
+          "kind": "param",
+          "category": "Data",
+          "type": "string?",
+          "default": "null",
+          "summary": "The property to show. Nested paths such as <code>&quot;Customer.Name&quot;</code> work, and a null anywhere along the path shows as blank. Also the column's key in state, sorts, filters and groups.",
+          "remarks": "Leave it out for a template-only column (e.g. action buttons); such a column can't be sorted, filtered or grouped."
+        },
+        {
+          "name": "Title",
+          "kind": "param",
+          "category": "Data",
+          "type": "string?",
+          "default": "null",
+          "summary": "Header text. Defaults to <a href=\"#/api/BzColumn/Field\"><code>Field</code></a>."
+        },
+        {
+          "name": "Format",
+          "kind": "param",
+          "category": "Data",
+          "type": "string?",
+          "default": "null",
+          "summary": ".NET format string applied to the value, e.g. <code>&quot;C2&quot;</code>, <code>&quot;N0&quot;</code> or <code>&quot;yyyy-MM-dd&quot;</code>."
+        },
+        {
+          "name": "FormatProvider",
+          "kind": "param",
+          "category": "Data",
+          "type": "IFormatProvider?",
+          "summary": "Culture used with <a href=\"#/api/BzColumn/Format\"><code>Format</code></a>. Defaults to the current culture."
+        },
+        {
+          "name": "DisplayText",
+          "kind": "param",
+          "category": "Data",
+          "type": "Func<TItem, string?>?",
+          "summary": "Custom display text for a row. Also used for text filtering, multi-select values and grouping."
+        },
+        {
+          "name": "Width",
+          "kind": "param",
+          "category": "Size & position",
+          "type": "double?",
+          "default": "null",
+          "summary": "Initial width in pixels. Null measures the header and a sample of the data once the data arrives."
+        },
+        {
+          "name": "MinWidth",
+          "kind": "param",
+          "category": "Size & position",
+          "type": "double",
+          "default": "48",
+          "summary": "The narrowest the user can resize the column to."
+        },
+        {
+          "name": "MaxAutoWidth",
+          "kind": "param",
+          "category": "Size & position",
+          "type": "double",
+          "default": "420",
+          "summary": "The widest automatic sizing (initial measure or &quot;Fit width&quot;) will make the column."
+        },
+        {
+          "name": "Locked",
+          "kind": "param",
+          "category": "Size & position",
+          "type": "ColumnLock",
+          "default": "ColumnLock.None",
+          "summary": "Locks the column to the left or right edge so it stays put while scrolling horizontally."
+        },
+        {
+          "name": "Visible",
+          "kind": "param",
+          "category": "Size & position",
+          "type": "bool",
+          "default": "true",
+          "summary": "Initial visibility. Users can hide and show columns from the column menu."
+        },
+        {
+          "name": "Align",
+          "kind": "param",
+          "category": "Size & position",
+          "type": "ColumnAlign",
+          "default": "ColumnAlign.Auto",
+          "summary": "Text alignment. <code>Auto</code> right-aligns numbers and left-aligns everything else."
+        },
+        {
+          "name": "Filter",
+          "kind": "param",
+          "category": "Features",
+          "type": "FilterKind",
+          "default": "FilterKind.Auto",
+          "summary": "The filter UI in the column menu. <code>Auto</code> picks it from the property type (text, number, date, or multi-select for bool and enums)."
+        },
+        {
+          "name": "Sortable",
+          "kind": "param",
+          "category": "Features",
+          "type": "bool",
+          "default": "true",
+          "summary": "Clicking the header sorts by this column."
+        },
+        {
+          "name": "Filterable",
+          "kind": "param",
+          "category": "Features",
+          "type": "bool",
+          "default": "true",
+          "summary": "The column menu offers a filter for this column."
+        },
+        {
+          "name": "Groupable",
+          "kind": "param",
+          "category": "Features",
+          "type": "bool",
+          "default": "true",
+          "summary": "The column can be grouped by (dragged to the group panel, or from its menu)."
+        },
+        {
+          "name": "Resizable",
+          "kind": "param",
+          "category": "Features",
+          "type": "bool",
+          "default": "true",
+          "summary": "The user can drag the header edge to resize the column."
+        },
+        {
+          "name": "Reorderable",
+          "kind": "param",
+          "category": "Features",
+          "type": "bool",
+          "default": "true",
+          "summary": "The user can drag the header to move the column."
+        },
+        {
+          "name": "Editable",
+          "kind": "param",
+          "category": "Features",
+          "type": "bool?",
+          "default": "null",
+          "summary": "Whether the cell gets an editor in edit mode. Null means editable when the property has a public setter. Set <code>true</code> with an <a href=\"#/api/BzColumn/EditTemplate\"><code>EditTemplate</code></a> to edit a read-only (computed) property."
+        },
+        {
+          "name": "GroupOrder",
+          "kind": "param",
+          "category": "Features",
+          "type": "IReadOnlyList<string>?",
+          "summary": "A fixed order for group values (by display text), e.g. a status workflow. Values not listed follow in natural order. An order the user sets in the column menu overrides this one."
+        },
+        {
+          "name": "CellClass",
+          "kind": "param",
+          "category": "Styling",
+          "type": "string?",
+          "default": "null",
+          "summary": "CSS class(es) on every cell of this column."
+        },
+        {
+          "name": "CellClassSelector",
+          "kind": "param",
+          "category": "Styling",
+          "type": "Func<TItem, string?>?",
+          "summary": "Returns extra CSS class(es) for one cell, or null. Use it for conditional formatting.",
+          "example": "<pre><code class=\"language-razor\">CellClassSelector=&quot;@(o =&gt; o.DueDate &lt; DateTime.Today ? &quot;overdue&quot; : null)&quot;</code></pre>"
+        },
+        {
+          "name": "HeaderClass",
+          "kind": "param",
+          "category": "Styling",
+          "type": "string?",
+          "default": "null",
+          "summary": "CSS class(es) on the header cell."
+        },
+        {
+          "name": "Template",
+          "kind": "param",
+          "category": "Templates",
+          "type": "RenderFragment<TItem>?",
+          "summary": "Renders the cell with any markup or components. <code>context</code> is the row's item.",
+          "example": "<pre><code class=\"language-razor\">&lt;BzColumn Field=&quot;Status&quot;&gt;\n    &lt;Template&gt;&lt;StatusBadge Status=&quot;@context.Status&quot; /&gt;&lt;/Template&gt;\n&lt;/BzColumn&gt;</code></pre>"
+        },
+        {
+          "name": "HtmlTemplate",
+          "kind": "param",
+          "category": "Templates",
+          "type": "string?",
+          "default": "null",
+          "summary": "A lighter alternative to <a href=\"#/api/BzColumn/Template\"><code>Template</code></a>: HTML with <code>{{Field}}</code> or <code>{{Field:format}}</code> placeholders. Values are HTML-encoded.",
+          "example": "<pre><code class=\"language-csharp\">HtmlTemplate=&quot;&lt;b&gt;{{SalesRep}}&lt;/b&gt; &lt;small&gt;#{{Id}}&lt;/small&gt;&quot;</code></pre>"
+        },
+        {
+          "name": "EditTemplate",
+          "kind": "param",
+          "category": "Templates",
+          "type": "RenderFragment<CellEditContext<TItem>>?",
+          "summary": "Editor used for this cell while its row is in edit mode. Read and set <code>context.Value</code>.",
+          "example": "<pre><code class=\"language-razor\">&lt;EditTemplate&gt;\n    &lt;select class=&quot;bz-editor&quot; value=&quot;@context.Value&quot; @onchange=&quot;e =&gt; context.Value = e.Value&quot;&gt;…&lt;/select&gt;\n&lt;/EditTemplate&gt;</code></pre>"
+        },
+        {
+          "name": "FooterTemplate",
+          "kind": "param",
+          "category": "Templates",
+          "type": "RenderFragment<GridFooterContext>?",
+          "summary": "Content of this column's cell in a footer row pinned under the data. The footer appears when any visible column has one.",
+          "example": "<pre><code class=\"language-razor\">&lt;FooterTemplate&gt;Total: @context.Count&lt;/FooterTemplate&gt;</code></pre>"
+        },
+        {
+          "name": "GroupHeaderTemplate",
+          "kind": "param",
+          "category": "Templates",
+          "type": "RenderFragment<GroupHeaderContext>?",
+          "summary": "Replaces the default &quot;Title: value (count)&quot; content of group rows when grouping by this column.",
+          "example": "<pre><code class=\"language-razor\">&lt;GroupHeaderTemplate&gt;@context.Text — @context.Count tasks&lt;/GroupHeaderTemplate&gt;</code></pre>"
+        }
+      ]
+    },
+    "ColumnModel": {
+      "name": "ColumnModel",
+      "display": "ColumnModel<TItem>",
+      "kind": "class",
+      "namespace": "BlazeGrid.Internal",
+      "summary": "A column at runtime: its <a href=\"#/api/BzColumn\"><code>BzColumn</code></a> definition plus the current layout. Get one from <code>BzGrid.FindColumn</code>, <code>Columns</code> or <code>VisibleColumns</code> and pass it to the grid's column methods.",
+      "members": [
+        {
+          "name": "Def",
+          "kind": "property",
+          "category": "Properties",
+          "type": "BzColumn<TItem>",
+          "access": "get",
+          "summary": "The column's declaration (its parameters)."
+        },
+        {
+          "name": "Key",
+          "kind": "property",
+          "category": "Properties",
+          "type": "string",
+          "access": "get",
+          "summary": "The key used in state, sorts, filters and groups: the Field, else the Title."
+        },
+        {
+          "name": "Kind",
+          "kind": "property",
+          "category": "Properties",
+          "type": "FilterKind",
+          "access": "get",
+          "summary": "The filter kind in effect (Auto resolved from the property type)."
+        },
+        {
+          "name": "IsNumeric",
+          "kind": "property",
+          "category": "Properties",
+          "type": "bool",
+          "access": "get",
+          "summary": "True for numeric, date and bool properties (they sort and filter as numbers)."
+        },
+        {
+          "name": "IsDate",
+          "kind": "property",
+          "category": "Properties",
+          "type": "bool",
+          "access": "get",
+          "summary": "True for DateTime, DateTimeOffset and DateOnly properties."
+        },
+        {
+          "name": "IsBool",
+          "kind": "property",
+          "category": "Properties",
+          "type": "bool",
+          "access": "get",
+          "summary": "True for bool properties."
+        },
+        {
+          "name": "IsEnum",
+          "kind": "property",
+          "category": "Properties",
+          "type": "bool",
+          "access": "get",
+          "summary": "True for enum properties."
+        },
+        {
+          "name": "Width",
+          "kind": "property",
+          "category": "Properties",
+          "type": "double",
+          "access": "get",
+          "summary": "Current width in pixels."
+        },
+        {
+          "name": "Lock",
+          "kind": "property",
+          "category": "Properties",
+          "type": "ColumnLock",
+          "access": "get",
+          "summary": "Current lock side."
+        },
+        {
+          "name": "Order",
+          "kind": "property",
+          "category": "Properties",
+          "type": "int",
+          "access": "get",
+          "summary": "Current display position."
+        },
+        {
+          "name": "Visible",
+          "kind": "property",
+          "category": "Properties",
+          "type": "bool",
+          "access": "get",
+          "summary": "Whether the column is currently shown."
+        },
+        {
+          "name": "Title",
+          "kind": "property",
+          "category": "Properties",
+          "type": "string",
+          "access": "get",
+          "summary": "Header text."
+        },
+        {
+          "name": "CanSort",
+          "kind": "property",
+          "category": "Properties",
+          "type": "bool",
+          "access": "get",
+          "summary": "The column can be sorted (Sortable and bound to data)."
+        },
+        {
+          "name": "CanFilter",
+          "kind": "property",
+          "category": "Properties",
+          "type": "bool",
+          "access": "get",
+          "summary": "The column can be filtered."
+        },
+        {
+          "name": "CanGroup",
+          "kind": "property",
+          "category": "Properties",
+          "type": "bool",
+          "access": "get",
+          "summary": "The column can be grouped by."
+        },
+        {
+          "name": "CanEdit",
+          "kind": "property",
+          "category": "Properties",
+          "type": "bool",
+          "access": "get",
+          "summary": "The column gets an editor in edit mode."
+        },
+        {
+          "name": "GetText",
+          "kind": "method",
+          "category": "Methods",
+          "type": "string",
+          "signature": "string GetText(TItem item)",
+          "summary": "The cell's display text for an item (DisplayText or the formatted value).",
+          "params": [
+            {
+              "name": "item",
+              "type": "TItem"
+            }
+          ]
+        },
+        {
+          "name": "GetValue",
+          "kind": "method",
+          "category": "Methods",
+          "type": "object?",
+          "signature": "object? GetValue(TItem item)",
+          "summary": "The raw property value for an item.",
+          "params": [
+            {
+              "name": "item",
+              "type": "TItem"
+            }
+          ]
+        }
+      ]
+    },
+    "ColumnFilter": {
+      "name": "ColumnFilter",
+      "display": "ColumnFilter",
+      "kind": "class",
+      "namespace": "BlazeGrid",
+      "summary": "A filter on one column. Which properties apply depends on <a href=\"#/api/ColumnFilter/Kind\"><code>Kind</code></a>: Text uses <a href=\"#/api/ColumnFilter/TextOperator\"><code>TextOperator</code></a> and <a href=\"#/api/ColumnFilter/Text\"><code>Text</code></a>; Number uses <a href=\"#/api/ColumnFilter/Operator\"><code>Operator</code></a>, <a href=\"#/api/ColumnFilter/Number\"><code>Number</code></a> and <a href=\"#/api/ColumnFilter/Number2\"><code>Number2</code></a>; Date uses <a href=\"#/api/ColumnFilter/Operator\"><code>Operator</code></a>, <a href=\"#/api/ColumnFilter/Date\"><code>Date</code></a> and <a href=\"#/api/ColumnFilter/Date2\"><code>Date2</code></a>; MultiSelect uses <a href=\"#/api/ColumnFilter/Values\"><code>Values</code></a>. Filters on different columns are combined with AND.",
+      "members": [
+        {
+          "name": "Field",
+          "kind": "property",
+          "category": "Properties",
+          "type": "string",
+          "default": "\"\"",
+          "access": "get; set",
+          "summary": "The column key. Filled in by <code>SetFilterAsync</code>."
+        },
+        {
+          "name": "Kind",
+          "kind": "property",
+          "category": "Properties",
+          "type": "FilterKind",
+          "default": "FilterKind.Auto",
+          "access": "get; set",
+          "summary": "The kind of filter, which decides which other properties are used."
+        },
+        {
+          "name": "TextOperator",
+          "kind": "property",
+          "category": "Properties",
+          "type": "TextOperator",
+          "default": "TextOperator.Contains",
+          "access": "get; set",
+          "summary": "Text filters: the operator."
+        },
+        {
+          "name": "Text",
+          "kind": "property",
+          "category": "Properties",
+          "type": "string?",
+          "default": "null",
+          "access": "get; set",
+          "summary": "Text filters: the text to look for."
+        },
+        {
+          "name": "Operator",
+          "kind": "property",
+          "category": "Properties",
+          "type": "CompareOperator",
+          "default": "CompareOperator.Equals",
+          "access": "get; set",
+          "summary": "Number and date filters: the comparison."
+        },
+        {
+          "name": "Number",
+          "kind": "property",
+          "category": "Properties",
+          "type": "double?",
+          "default": "null",
+          "access": "get; set",
+          "summary": "Number filters: the value (the lower bound for Between)."
+        },
+        {
+          "name": "Number2",
+          "kind": "property",
+          "category": "Properties",
+          "type": "double?",
+          "default": "null",
+          "access": "get; set",
+          "summary": "Number filters: the upper bound for Between."
+        },
+        {
+          "name": "Date",
+          "kind": "property",
+          "category": "Properties",
+          "type": "DateTime?",
+          "access": "get; set",
+          "summary": "Date filters: the day (the first day for Between). The time of day is ignored."
+        },
+        {
+          "name": "Date2",
+          "kind": "property",
+          "category": "Properties",
+          "type": "DateTime?",
+          "access": "get; set",
+          "summary": "Date filters: the last day for Between."
+        },
+        {
+          "name": "Values",
+          "kind": "property",
+          "category": "Properties",
+          "type": "List<string>?",
+          "access": "get; set",
+          "summary": "Multi-select filters: the display values to keep. An empty list matches nothing; null means no filter."
+        },
+        {
+          "name": "IsActive",
+          "kind": "property",
+          "category": "Properties",
+          "type": "bool",
+          "default": "false",
+          "access": "get",
+          "summary": "True when the filter has enough input to apply (e.g. a Between filter needs both values)."
+        },
+        {
+          "name": "Clone",
+          "kind": "method",
+          "category": "Methods",
+          "type": "ColumnFilter",
+          "signature": "ColumnFilter Clone()",
+          "summary": "Returns a deep copy."
+        }
+      ]
+    },
+    "SortDescriptor": {
+      "name": "SortDescriptor",
+      "display": "SortDescriptor",
+      "kind": "class",
+      "namespace": "BlazeGrid",
+      "summary": "One sort or grouping: a column key and a direction.",
+      "members": [
+        {
+          "name": "Field",
+          "kind": "property",
+          "category": "Properties",
+          "type": "string",
+          "default": "\"\"",
+          "access": "get; set",
+          "summary": "The column key (its Field, else its Title)."
+        },
+        {
+          "name": "Direction",
+          "kind": "property",
+          "category": "Properties",
+          "type": "SortDirection",
+          "default": "SortDirection.Ascending",
+          "access": "get; set",
+          "summary": "The direction."
+        },
+        {
+          "name": "Clone",
+          "kind": "method",
+          "category": "Methods",
+          "type": "SortDescriptor",
+          "signature": "SortDescriptor Clone()",
+          "summary": "Returns a copy."
+        }
+      ]
+    },
+    "GridQuery": {
+      "name": "GridQuery",
+      "display": "GridQuery",
+      "kind": "class",
+      "namespace": "BlazeGrid",
+      "summary": "A snapshot of the grid's query, suitable for sending to an API.",
+      "members": [
+        {
+          "name": "Filters",
+          "kind": "property",
+          "category": "Properties",
+          "type": "IReadOnlyList<ColumnFilter>",
+          "access": "get; init",
+          "summary": "Active column filters (combine them with AND)."
+        },
+        {
+          "name": "Sorts",
+          "kind": "property",
+          "category": "Properties",
+          "type": "IReadOnlyList<SortDescriptor>",
+          "access": "get; init",
+          "summary": "Active sorts, highest priority first."
+        },
+        {
+          "name": "Groups",
+          "kind": "property",
+          "category": "Properties",
+          "type": "IReadOnlyList<SortDescriptor>",
+          "access": "get; init",
+          "summary": "Active groupings, outermost first. Sort by these before <a href=\"#/api/GridQuery/Sorts\"><code>Sorts</code></a>."
+        },
+        {
+          "name": "Page",
+          "kind": "property",
+          "category": "Properties",
+          "type": "int",
+          "default": "0",
+          "access": "get; init",
+          "summary": "Zero-based page."
+        },
+        {
+          "name": "PageSize",
+          "kind": "property",
+          "category": "Properties",
+          "type": "int",
+          "default": "0",
+          "access": "get; init",
+          "summary": "Rows per page (0 = paging off)."
+        },
+        {
+          "name": "Skip",
+          "kind": "property",
+          "category": "Properties",
+          "type": "int",
+          "default": "0",
+          "access": "get",
+          "summary": "Rows to skip: <code>Page × PageSize</code>."
+        },
+        {
+          "name": "Reason",
+          "kind": "property",
+          "category": "Properties",
+          "type": "string",
+          "default": "\"\"",
+          "access": "get; init",
+          "summary": "What triggered the query: &quot;filter&quot;, &quot;sort&quot;, &quot;group&quot;, &quot;page&quot;, &quot;pagesize&quot; or &quot;state&quot;."
+        }
+      ]
+    },
+    "GridState": {
+      "name": "GridState",
+      "display": "GridState",
+      "kind": "class",
+      "namespace": "BlazeGrid",
+      "summary": "Everything the grid persists: column layout, sorts, filters, groups, group value orders and page size. Plain data that serializes to JSON, so you can store named layouts on your server.",
+      "members": [
+        {
+          "name": "Version",
+          "kind": "property",
+          "category": "Properties",
+          "type": "int",
+          "default": "1",
+          "access": "get; set",
+          "summary": "Format version."
+        },
+        {
+          "name": "Columns",
+          "kind": "property",
+          "category": "Properties",
+          "type": "List<ColumnState>",
+          "access": "get; set",
+          "summary": "Per-column layout."
+        },
+        {
+          "name": "Sorts",
+          "kind": "property",
+          "category": "Properties",
+          "type": "List<SortDescriptor>",
+          "access": "get; set",
+          "summary": "Active sorts, highest priority first."
+        },
+        {
+          "name": "Filters",
+          "kind": "property",
+          "category": "Properties",
+          "type": "List<ColumnFilter>",
+          "access": "get; set",
+          "summary": "Active column filters."
+        },
+        {
+          "name": "Groups",
+          "kind": "property",
+          "category": "Properties",
+          "type": "List<SortDescriptor>",
+          "access": "get; set",
+          "summary": "Active groupings, outermost first."
+        },
+        {
+          "name": "GroupOrders",
+          "kind": "property",
+          "category": "Properties",
+          "type": "Dictionary<string, List<string>>",
+          "access": "get; set",
+          "summary": "User-defined group value order per column key (overrides the column's GroupOrder)."
+        },
+        {
+          "name": "PageSize",
+          "kind": "property",
+          "category": "Properties",
+          "type": "int",
+          "default": "0",
+          "access": "get; set",
+          "summary": "The page size the user picked (only restored when the grid has paging on)."
+        }
+      ]
+    },
+    "ColumnState": {
+      "name": "ColumnState",
+      "display": "ColumnState",
+      "kind": "class",
+      "namespace": "BlazeGrid",
+      "summary": "The persisted layout of one column.",
+      "members": [
+        {
+          "name": "Field",
+          "kind": "property",
+          "category": "Properties",
+          "type": "string",
+          "default": "\"\"",
+          "access": "get; set",
+          "summary": "The column key."
+        },
+        {
+          "name": "Width",
+          "kind": "property",
+          "category": "Properties",
+          "type": "double?",
+          "default": "null",
+          "access": "get; set",
+          "summary": "Width in pixels, or null when the column is still sized automatically."
+        },
+        {
+          "name": "Lock",
+          "kind": "property",
+          "category": "Properties",
+          "type": "ColumnLock",
+          "default": "ColumnLock.None",
+          "access": "get; set",
+          "summary": "The lock side."
+        },
+        {
+          "name": "Order",
+          "kind": "property",
+          "category": "Properties",
+          "type": "int",
+          "default": "0",
+          "access": "get; set",
+          "summary": "Display position."
+        },
+        {
+          "name": "Visible",
+          "kind": "property",
+          "category": "Properties",
+          "type": "bool",
+          "default": "true",
+          "access": "get; set",
+          "summary": "Whether the column is shown."
+        }
+      ]
+    },
+    "RowEventArgs": {
+      "name": "RowEventArgs",
+      "display": "RowEventArgs<TItem>",
+      "kind": "class",
+      "namespace": "BlazeGrid",
+      "summary": "Arguments of <code>OnRowClick</code> and <code>OnRowDoubleClick</code>.",
+      "members": [
+        {
+          "name": "Item",
+          "kind": "property",
+          "category": "Properties",
+          "type": "TItem",
+          "access": "get; init",
+          "required": true,
+          "summary": "The row's item."
+        },
+        {
+          "name": "Index",
+          "kind": "property",
+          "category": "Properties",
+          "type": "int",
+          "default": "0",
+          "access": "get; init",
+          "summary": "The item's index in <code>Items</code>."
+        }
+      ]
+    },
+    "RowEditStartEventArgs": {
+      "name": "RowEditStartEventArgs",
+      "display": "RowEditStartEventArgs<TItem>",
+      "kind": "class",
+      "namespace": "BlazeGrid",
+      "summary": "Arguments of <code>OnRowEditStart</code>.",
+      "members": [
+        {
+          "name": "Item",
+          "kind": "property",
+          "category": "Properties",
+          "type": "TItem",
+          "access": "get; init",
+          "required": true,
+          "summary": "The row about to be edited."
+        },
+        {
+          "name": "Cancel",
+          "kind": "property",
+          "category": "Properties",
+          "type": "bool",
+          "default": "false",
+          "access": "get; set",
+          "summary": "Set to true to keep the row read-only."
+        }
+      ]
+    },
+    "RowEditCommitEventArgs": {
+      "name": "RowEditCommitEventArgs",
+      "display": "RowEditCommitEventArgs<TItem>",
+      "kind": "class",
+      "namespace": "BlazeGrid",
+      "summary": "Arguments of <code>OnRowEditCommit</code> and <code>OnRowUpdated</code>.",
+      "members": [
+        {
+          "name": "Item",
+          "kind": "property",
+          "category": "Properties",
+          "type": "TItem",
+          "access": "get; init",
+          "required": true,
+          "summary": "The edited item."
+        },
+        {
+          "name": "Changes",
+          "kind": "property",
+          "category": "Properties",
+          "type": "IReadOnlyDictionary<string, CellChange>",
+          "access": "get; init",
+          "required": true,
+          "summary": "The changed values, keyed by column key. Unchanged cells are not included."
+        },
+        {
+          "name": "Cancel",
+          "kind": "property",
+          "category": "Properties",
+          "type": "bool",
+          "default": "false",
+          "access": "get; set",
+          "summary": "OnRowEditCommit only: set to true to keep the row in edit mode (e.g. validation failed)."
+        },
+        {
+          "name": "Error",
+          "kind": "property",
+          "category": "Properties",
+          "type": "string?",
+          "default": "null",
+          "access": "get; set",
+          "summary": "OnRowEditCommit only: the message shown above the grid when <a href=\"#/api/RowEditCommitEventArgs/Cancel\"><code>Cancel</code></a> is set."
+        }
+      ]
+    },
+    "CellChange": {
+      "name": "CellChange",
+      "display": "CellChange",
+      "kind": "record",
+      "namespace": "BlazeGrid",
+      "summary": "One edited value: the column key with its value before and after.",
+      "members": [
+        {
+          "name": "Field",
+          "kind": "property",
+          "category": "Properties",
+          "type": "string",
+          "access": "get; init",
+          "summary": "The column key."
+        },
+        {
+          "name": "OldValue",
+          "kind": "property",
+          "category": "Properties",
+          "type": "object?",
+          "access": "get; init",
+          "summary": "The value when editing started."
+        },
+        {
+          "name": "NewValue",
+          "kind": "property",
+          "category": "Properties",
+          "type": "object?",
+          "access": "get; init",
+          "summary": "The edited value, converted to the property type."
+        }
+      ]
+    },
+    "CellValueChangedEventArgs": {
+      "name": "CellValueChangedEventArgs",
+      "display": "CellValueChangedEventArgs<TItem>",
+      "kind": "class",
+      "namespace": "BlazeGrid",
+      "summary": "Arguments of <code>OnCellValueChanged</code>.",
+      "members": [
+        {
+          "name": "Item",
+          "kind": "property",
+          "category": "Properties",
+          "type": "TItem",
+          "access": "get; init",
+          "required": true,
+          "summary": "The row being edited."
+        },
+        {
+          "name": "Field",
+          "kind": "property",
+          "category": "Properties",
+          "type": "string",
+          "default": "null",
+          "access": "get; init",
+          "required": true,
+          "summary": "The column key."
+        },
+        {
+          "name": "OldValue",
+          "kind": "property",
+          "category": "Properties",
+          "type": "object?",
+          "access": "get; init",
+          "summary": "The editor's previous value."
+        },
+        {
+          "name": "NewValue",
+          "kind": "property",
+          "category": "Properties",
+          "type": "object?",
+          "access": "get; init",
+          "summary": "The editor's new value, already converted to the property type."
+        }
+      ]
+    },
+    "FilterChangedEventArgs": {
+      "name": "FilterChangedEventArgs",
+      "display": "FilterChangedEventArgs",
+      "kind": "class",
+      "namespace": "BlazeGrid",
+      "summary": "Arguments of <code>OnFilterChanged</code>.",
+      "members": [
+        {
+          "name": "Field",
+          "kind": "property",
+          "category": "Properties",
+          "type": "string",
+          "default": "null",
+          "access": "get; init",
+          "required": true,
+          "summary": "The column whose filter changed (&quot;&quot; when all filters were cleared)."
+        },
+        {
+          "name": "Filter",
+          "kind": "property",
+          "category": "Properties",
+          "type": "ColumnFilter?",
+          "access": "get; init",
+          "summary": "The column's new filter, or null when it was cleared."
+        },
+        {
+          "name": "Filters",
+          "kind": "property",
+          "category": "Properties",
+          "type": "IReadOnlyList<ColumnFilter>",
+          "access": "get; init",
+          "required": true,
+          "summary": "All active filters after the change."
+        },
+        {
+          "name": "Query",
+          "kind": "property",
+          "category": "Properties",
+          "type": "GridQuery",
+          "access": "get; init",
+          "required": true,
+          "summary": "The full query after the change."
+        }
+      ]
+    },
+    "GridRenderStats": {
+      "name": "GridRenderStats",
+      "display": "GridRenderStats",
+      "kind": "class",
+      "namespace": "BlazeGrid",
+      "summary": "Arguments of <code>OnRenderStats</code>: timings for the last data load.",
+      "members": [
+        {
+          "name": "Rows",
+          "kind": "property",
+          "category": "Properties",
+          "type": "int",
+          "default": "0",
+          "access": "get; init",
+          "summary": "Data rows after filtering."
+        },
+        {
+          "name": "VisibleRows",
+          "kind": "property",
+          "category": "Properties",
+          "type": "int",
+          "default": "0",
+          "access": "get; init",
+          "summary": "Display rows (data rows on the page plus group rows)."
+        },
+        {
+          "name": "Engine",
+          "kind": "property",
+          "category": "Properties",
+          "type": "string",
+          "default": "\"\"",
+          "access": "get; init",
+          "summary": "The engine that ran the query: &quot;managed&quot; or &quot;worker&quot;."
+        },
+        {
+          "name": "QueryMs",
+          "kind": "property",
+          "category": "Properties",
+          "type": "double",
+          "default": "0",
+          "access": "get; init",
+          "summary": "Filter, sort and group compute time in milliseconds."
+        },
+        {
+          "name": "DomMs",
+          "kind": "property",
+          "category": "Properties",
+          "type": "double",
+          "default": "0",
+          "access": "get; init",
+          "summary": "Data received → DOM updated, in milliseconds."
+        },
+        {
+          "name": "PaintMs",
+          "kind": "property",
+          "category": "Properties",
+          "type": "double",
+          "default": "0",
+          "access": "get; init",
+          "summary": "Data received → next painted frame, in milliseconds."
+        }
+      ]
+    },
+    "CellEditContext": {
+      "name": "CellEditContext",
+      "display": "CellEditContext<TItem>",
+      "kind": "class",
+      "namespace": "BlazeGrid",
+      "summary": "The <code>context</code> of a column's EditTemplate.",
+      "members": [
+        {
+          "name": "Item",
+          "kind": "property",
+          "category": "Properties",
+          "type": "TItem",
+          "access": "get",
+          "summary": "The row being edited (still holding its original values)."
+        },
+        {
+          "name": "Field",
+          "kind": "property",
+          "category": "Properties",
+          "type": "string",
+          "access": "get",
+          "summary": "The column key."
+        },
+        {
+          "name": "Value",
+          "kind": "property",
+          "category": "Properties",
+          "type": "object?",
+          "access": "get; set",
+          "summary": "The pending value. Setting it converts to the property type and raises OnCellValueChanged."
+        }
+      ]
+    },
+    "GridFooterContext": {
+      "name": "GridFooterContext",
+      "display": "GridFooterContext",
+      "kind": "class",
+      "namespace": "BlazeGrid",
+      "summary": "The <code>context</code> of a column's FooterTemplate.",
+      "members": [
+        {
+          "name": "Count",
+          "kind": "property",
+          "category": "Properties",
+          "type": "int",
+          "default": "0",
+          "access": "get; init",
+          "summary": "Rows after filtering (all pages)."
+        },
+        {
+          "name": "PageCount",
+          "kind": "property",
+          "category": "Properties",
+          "type": "int",
+          "default": "0",
+          "access": "get; init",
+          "summary": "Rows on the current page (equals Count when paging is off)."
+        }
+      ]
+    },
+    "GroupHeaderContext": {
+      "name": "GroupHeaderContext",
+      "display": "GroupHeaderContext",
+      "kind": "class",
+      "namespace": "BlazeGrid",
+      "summary": "The <code>context</code> of a column's GroupHeaderTemplate.",
+      "members": [
+        {
+          "name": "Field",
+          "kind": "property",
+          "category": "Properties",
+          "type": "string",
+          "default": "null",
+          "access": "get; init",
+          "required": true,
+          "summary": "The grouped column's key."
+        },
+        {
+          "name": "Title",
+          "kind": "property",
+          "category": "Properties",
+          "type": "string",
+          "default": "null",
+          "access": "get; init",
+          "required": true,
+          "summary": "The grouped column's title."
+        },
+        {
+          "name": "Text",
+          "kind": "property",
+          "category": "Properties",
+          "type": "string",
+          "default": "null",
+          "access": "get; init",
+          "required": true,
+          "summary": "The group value's display text (&quot;&quot; for blank values)."
+        },
+        {
+          "name": "Count",
+          "kind": "property",
+          "category": "Properties",
+          "type": "int",
+          "default": "0",
+          "access": "get; init",
+          "summary": "Data rows in the group (all pages)."
+        },
+        {
+          "name": "Level",
+          "kind": "property",
+          "category": "Properties",
+          "type": "int",
+          "default": "0",
+          "access": "get; init",
+          "summary": "Nesting depth (0 = outermost grouping)."
+        },
+        {
+          "name": "Continued",
+          "kind": "property",
+          "category": "Properties",
+          "type": "bool",
+          "default": "false",
+          "access": "get; init",
+          "summary": "True when the header is repeated at the top of a page that starts mid-group."
+        }
+      ]
+    },
+    "ColumnLock": {
+      "name": "ColumnLock",
+      "display": "ColumnLock",
+      "kind": "enum",
+      "namespace": "BlazeGrid",
+      "summary": "Which edge a column is locked to.",
+      "members": [
+        {
+          "name": "None",
+          "kind": "value",
+          "category": "Values",
+          "type": "ColumnLock",
+          "default": "0",
+          "summary": "Scrolls horizontally with the other columns."
+        },
+        {
+          "name": "Left",
+          "kind": "value",
+          "category": "Values",
+          "type": "ColumnLock",
+          "default": "1",
+          "summary": "Stays at the left edge."
+        },
+        {
+          "name": "Right",
+          "kind": "value",
+          "category": "Values",
+          "type": "ColumnLock",
+          "default": "2",
+          "summary": "Stays at the right edge."
+        }
+      ]
+    },
+    "ColumnAlign": {
+      "name": "ColumnAlign",
+      "display": "ColumnAlign",
+      "kind": "enum",
+      "namespace": "BlazeGrid",
+      "summary": "Horizontal alignment of a column's cells.",
+      "members": [
+        {
+          "name": "Auto",
+          "kind": "value",
+          "category": "Values",
+          "type": "ColumnAlign",
+          "default": "0",
+          "summary": "Numbers right-aligned, everything else left-aligned."
+        },
+        {
+          "name": "Left",
+          "kind": "value",
+          "category": "Values",
+          "type": "ColumnAlign",
+          "default": "1",
+          "summary": "Left-aligned."
+        },
+        {
+          "name": "Center",
+          "kind": "value",
+          "category": "Values",
+          "type": "ColumnAlign",
+          "default": "2",
+          "summary": "Centered."
+        },
+        {
+          "name": "Right",
+          "kind": "value",
+          "category": "Values",
+          "type": "ColumnAlign",
+          "default": "3",
+          "summary": "Right-aligned."
+        }
+      ]
+    },
+    "FilterKind": {
+      "name": "FilterKind",
+      "display": "FilterKind",
+      "kind": "enum",
+      "namespace": "BlazeGrid",
+      "summary": "The filter UI a column offers in its menu.",
+      "members": [
+        {
+          "name": "Auto",
+          "kind": "value",
+          "category": "Values",
+          "type": "FilterKind",
+          "default": "0",
+          "summary": "Chosen from the property type: Date for dates, MultiSelect for bool and enums, Number for numbers, else Text."
+        },
+        {
+          "name": "None",
+          "kind": "value",
+          "category": "Values",
+          "type": "FilterKind",
+          "default": "1",
+          "summary": "No filter."
+        },
+        {
+          "name": "Text",
+          "kind": "value",
+          "category": "Values",
+          "type": "FilterKind",
+          "default": "2",
+          "summary": "Text with an operator (contains, equals, starts with, …). Case-insensitive."
+        },
+        {
+          "name": "Number",
+          "kind": "value",
+          "category": "Values",
+          "type": "FilterKind",
+          "default": "3",
+          "summary": "Number with a comparison (=, ≠, &gt;, ≥, &lt;, ≤, between, blank)."
+        },
+        {
+          "name": "Date",
+          "kind": "value",
+          "category": "Values",
+          "type": "FilterKind",
+          "default": "4",
+          "summary": "Date with a comparison (on, before, after, between, blank). Compares whole days."
+        },
+        {
+          "name": "MultiSelect",
+          "kind": "value",
+          "category": "Values",
+          "type": "FilterKind",
+          "default": "5",
+          "summary": "A checklist of the column's distinct values, with counts and search."
+        }
+      ]
+    },
+    "TextOperator": {
+      "name": "TextOperator",
+      "display": "TextOperator",
+      "kind": "enum",
+      "namespace": "BlazeGrid",
+      "summary": "Operator of a <a href=\"#/api/FilterKind/Text\"><code>FilterKind.Text</code></a> filter. Comparisons ignore case.",
+      "members": [
+        {
+          "name": "Contains",
+          "kind": "value",
+          "category": "Values",
+          "type": "TextOperator",
+          "default": "0",
+          "summary": "The text appears anywhere in the value."
+        },
+        {
+          "name": "NotContains",
+          "kind": "value",
+          "category": "Values",
+          "type": "TextOperator",
+          "default": "1",
+          "summary": "The text does not appear in the value."
+        },
+        {
+          "name": "Equals",
+          "kind": "value",
+          "category": "Values",
+          "type": "TextOperator",
+          "default": "2",
+          "summary": "The value equals the text."
+        },
+        {
+          "name": "NotEquals",
+          "kind": "value",
+          "category": "Values",
+          "type": "TextOperator",
+          "default": "3",
+          "summary": "The value differs from the text."
+        },
+        {
+          "name": "StartsWith",
+          "kind": "value",
+          "category": "Values",
+          "type": "TextOperator",
+          "default": "4",
+          "summary": "The value starts with the text."
+        },
+        {
+          "name": "EndsWith",
+          "kind": "value",
+          "category": "Values",
+          "type": "TextOperator",
+          "default": "5",
+          "summary": "The value ends with the text."
+        },
+        {
+          "name": "Empty",
+          "kind": "value",
+          "category": "Values",
+          "type": "TextOperator",
+          "default": "6",
+          "summary": "The value is null or empty (the text is ignored)."
+        },
+        {
+          "name": "NotEmpty",
+          "kind": "value",
+          "category": "Values",
+          "type": "TextOperator",
+          "default": "7",
+          "summary": "The value is not null or empty (the text is ignored)."
+        }
+      ]
+    },
+    "CompareOperator": {
+      "name": "CompareOperator",
+      "display": "CompareOperator",
+      "kind": "enum",
+      "namespace": "BlazeGrid",
+      "summary": "Operator of a <a href=\"#/api/FilterKind/Number\"><code>FilterKind.Number</code></a> or <a href=\"#/api/FilterKind/Date\"><code>FilterKind.Date</code></a> filter.",
+      "members": [
+        {
+          "name": "Equals",
+          "kind": "value",
+          "category": "Values",
+          "type": "CompareOperator",
+          "default": "0",
+          "summary": "Equal to the first value (for dates: on that day)."
+        },
+        {
+          "name": "NotEquals",
+          "kind": "value",
+          "category": "Values",
+          "type": "CompareOperator",
+          "default": "1",
+          "summary": "Not equal to the first value (for dates: not on that day)."
+        },
+        {
+          "name": "GreaterThan",
+          "kind": "value",
+          "category": "Values",
+          "type": "CompareOperator",
+          "default": "2",
+          "summary": "Greater than the first value (for dates: after that day)."
+        },
+        {
+          "name": "GreaterOrEqual",
+          "kind": "value",
+          "category": "Values",
+          "type": "CompareOperator",
+          "default": "3",
+          "summary": "Greater than or equal to the first value (for dates: on or after)."
+        },
+        {
+          "name": "LessThan",
+          "kind": "value",
+          "category": "Values",
+          "type": "CompareOperator",
+          "default": "4",
+          "summary": "Less than the first value (for dates: before that day)."
+        },
+        {
+          "name": "LessOrEqual",
+          "kind": "value",
+          "category": "Values",
+          "type": "CompareOperator",
+          "default": "5",
+          "summary": "Less than or equal to the first value (for dates: on or before)."
+        },
+        {
+          "name": "Between",
+          "kind": "value",
+          "category": "Values",
+          "type": "CompareOperator",
+          "default": "6",
+          "summary": "Between the two values, inclusive. Their order doesn't matter."
+        },
+        {
+          "name": "Empty",
+          "kind": "value",
+          "category": "Values",
+          "type": "CompareOperator",
+          "default": "7",
+          "summary": "The value is null."
+        },
+        {
+          "name": "NotEmpty",
+          "kind": "value",
+          "category": "Values",
+          "type": "CompareOperator",
+          "default": "8",
+          "summary": "The value is not null."
+        }
+      ]
+    },
+    "SortDirection": {
+      "name": "SortDirection",
+      "display": "SortDirection",
+      "kind": "enum",
+      "namespace": "BlazeGrid",
+      "summary": "Sort or group direction.",
+      "members": [
+        {
+          "name": "Ascending",
+          "kind": "value",
+          "category": "Values",
+          "type": "SortDirection",
+          "default": "0",
+          "summary": "A → Z, 0 → 9, oldest first."
+        },
+        {
+          "name": "Descending",
+          "kind": "value",
+          "category": "Values",
+          "type": "SortDirection",
+          "default": "1",
+          "summary": "Z → A, 9 → 0, newest first."
+        }
+      ]
+    },
+    "DataEngineMode": {
+      "name": "DataEngineMode",
+      "display": "DataEngineMode",
+      "kind": "enum",
+      "namespace": "BlazeGrid",
+      "summary": "Where filtering, sorting and grouping are computed.",
+      "members": [
+        {
+          "name": "Auto",
+          "kind": "value",
+          "category": "Values",
+          "type": "DataEngineMode",
+          "default": "0",
+          "summary": ".NET for small data, a Web Worker from <code>WorkerThreshold</code> rows up."
+        },
+        {
+          "name": "Managed",
+          "kind": "value",
+          "category": "Values",
+          "type": "DataEngineMode",
+          "default": "1",
+          "summary": "Always compute in .NET on the UI thread."
+        },
+        {
+          "name": "Worker",
+          "kind": "value",
+          "category": "Values",
+          "type": "DataEngineMode",
+          "default": "2",
+          "summary": "Always compute in a background Web Worker."
+        }
+      ]
+    },
+    "EditTrigger": {
+      "name": "EditTrigger",
+      "display": "EditTrigger",
+      "kind": "enum",
+      "namespace": "BlazeGrid",
+      "summary": "What puts a row into edit mode.",
+      "members": [
+        {
+          "name": "None",
+          "kind": "value",
+          "category": "Values",
+          "type": "EditTrigger",
+          "default": "0",
+          "summary": "Only code (<code>BeginEditAsync</code>) or the edit command button."
+        },
+        {
+          "name": "DoubleClick",
+          "kind": "value",
+          "category": "Values",
+          "type": "EditTrigger",
+          "default": "1",
+          "summary": "Double-clicking the row."
+        }
+      ]
+    }
+  },
+  "cssVariables": [
+    {
+      "name": "--bz-font",
+      "value": "13px/1.3 system-ui, -apple-system, \"Segoe UI\", Roboto, sans-serif",
+      "description": "Font shorthand for the whole grid (size/line-height and family)."
+    },
+    {
+      "name": "--bz-bg",
+      "value": "#ffffff",
+      "dark": "#111418",
+      "description": "Background of the grid and of data rows."
+    },
+    {
+      "name": "--bz-fg",
+      "value": "#1f2328",
+      "dark": "#e6e8eb",
+      "description": "Main text color."
+    },
+    {
+      "name": "--bz-muted",
+      "value": "#6b7280",
+      "dark": "#9aa3ad",
+      "description": "Secondary text: hints, counts, inactive icons."
+    },
+    {
+      "name": "--bz-border",
+      "value": "#e5e7eb",
+      "dark": "#262b31",
+      "description": "Row separators and light borders."
+    },
+    {
+      "name": "--bz-border-strong",
+      "value": "#d1d5db",
+      "dark": "#353c44",
+      "description": "Header underline, locked-column edges, input borders."
+    },
+    {
+      "name": "--bz-header-bg",
+      "value": "#f8fafc",
+      "dark": "#171b20",
+      "description": "Header, group panel and pager background."
+    },
+    {
+      "name": "--bz-header-fg",
+      "value": "#374151",
+      "dark": "#cfd5db",
+      "description": "Header text color."
+    },
+    {
+      "name": "--bz-header-weight",
+      "value": "600",
+      "description": "Header font weight."
+    },
+    {
+      "name": "--bz-row-alt",
+      "value": "#fbfcfd",
+      "dark": "#13171b",
+      "description": "Background of every other row (set equal to --bz-bg to turn striping off)."
+    },
+    {
+      "name": "--bz-row-hover",
+      "value": "#f1f5fb",
+      "dark": "#1b222a",
+      "description": "Row background on hover; also button hover states."
+    },
+    {
+      "name": "--bz-selected",
+      "value": "#e0ecff",
+      "dark": "#1e3354",
+      "description": "Background of the selected row and of a row in edit mode."
+    },
+    {
+      "name": "--bz-accent",
+      "value": "#2563eb",
+      "dark": "#5b9dff",
+      "description": "Accent color: sort arrows, active filters, current page, focus rings."
+    },
+    {
+      "name": "--bz-accent-fg",
+      "value": "#ffffff",
+      "dark": "#0b1020",
+      "description": "Text on accent-colored backgrounds."
+    },
+    {
+      "name": "--bz-group-bg",
+      "value": "#f3f5f8",
+      "dark": "#191e24",
+      "description": "Background of group header rows."
+    },
+    {
+      "name": "--bz-group-fg",
+      "value": "#111827",
+      "dark": "#f1f3f5",
+      "description": "Text color of group header rows."
+    },
+    {
+      "name": "--bz-footer-bg",
+      "value": "var(--bz-header-bg)",
+      "description": "Background of the footer row (FooterTemplate)."
+    },
+    {
+      "name": "--bz-lock-shadow",
+      "value": "rgba(15, 23, 42, .12)",
+      "dark": "rgba(0, 0, 0, .45)",
+      "description": "Shadow cast by locked columns over scrolled content (transparent to remove)."
+    },
+    {
+      "name": "--bz-cell-px",
+      "value": "10px",
+      "description": "Horizontal cell padding."
+    },
+    {
+      "name": "--bz-radius",
+      "value": "8px",
+      "description": "Corner radius of the grid."
+    },
+    {
+      "name": "--bz-menu-bg",
+      "value": "#ffffff",
+      "dark": "#1a1f25",
+      "description": "Column menu and loading-pill background."
+    },
+    {
+      "name": "--bz-menu-shadow",
+      "value": "0 10px 30px rgba(15, 23, 42, .18), 0 2px 6px rgba(15, 23, 42, .08)",
+      "dark": "0 10px 30px rgba(0, 0, 0, .5)",
+      "description": "Column menu shadow."
+    },
+    {
+      "name": "--bz-loading-bg",
+      "value": "rgba(255, 255, 255, .6)",
+      "dark": "rgba(17, 20, 24, .6)",
+      "description": "Overlay color behind the loading indicator."
+    },
+    {
+      "name": "--bz-input-bg",
+      "value": "#ffffff",
+      "dark": "#111418",
+      "description": "Background of editors, filter inputs and selects."
+    },
+    {
+      "name": "--bz-error-bg",
+      "value": "#fef2f2",
+      "dark": "#3a1618",
+      "description": "Background of the edit error bar."
+    },
+    {
+      "name": "--bz-error-fg",
+      "value": "#b91c1c",
+      "dark": "#fca5a5",
+      "description": "Text color of the edit error bar."
+    }
+  ]
+}
