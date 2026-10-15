@@ -74,6 +74,16 @@
             }
         </div>
         <GridBody TItem="TItem" Grid="this" @ref="_body" />
+        @if (HasFooter)
+        {
+            var footer = new GridFooterContext { Count = TotalItemCount, PageCount = CurrentPageRowCount };
+            <div class="bz-footer" role="row">
+                @foreach (var col in _visible)
+                {
+                    <div class="@col.CellCss" style="@col.CellStyle" role="gridcell">@col.Def.FooterTemplate?.Invoke(footer)</div>
+                }
+            </div>
+        }
     </div>
 
     @if (_pageSize > 0)

@@ -26,6 +26,18 @@
         "http://localhost:5179"
       ],
       "port": 5179
+    },
+    {
+      "name": "docs",
+      "runtimeExecutable": "python",
+      "runtimeArgs": [
+        "-m",
+        "http.server",
+        "5180",
+        "--directory",
+        "docs"
+      ],
+      "port": 5180
     }
   ]
 }

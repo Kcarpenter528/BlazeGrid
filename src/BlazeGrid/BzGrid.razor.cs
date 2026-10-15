@@ -1,3 +1,4 @@
+using System.ComponentModel;
 using System.Diagnostics;
 using System.Globalization;
 using System.Text;
@@ -10,6 +11,23 @@ using Microsoft.JSInterop;
 
 namespace BlazeGrid;
 
+/// <summary>
+/// A virtualized data grid. Only the rows in view exist in the DOM, so it stays fast with hundreds of thousands of
+/// rows. Declare columns with <see cref="BzColumn{TItem}"/> inside it.
+/// </summary>
+/// <remarks>
+/// Filtering, sorting and grouping run in .NET or in a background Web Worker (see <see cref="Engine"/>). With none of
+/// them active, new data goes straight to rendering. Scrolling re-renders only the body, and column widths live in CSS
+/// variables, so resizing never re-renders cells.
+/// </remarks>
+/// <example><code>
+/// &lt;BzGrid TItem="Order" Items="orders" Height="600px" PageSize="100" StateKey="orders"&gt;
+///     &lt;BzColumn Field="Id" Title="#" Locked="ColumnLock.Left" /&gt;
+///     &lt;BzColumn Field="Customer" Filter="FilterKind.MultiSelect" /&gt;
+///     &lt;BzColumn Field="OrderDate" Format="yyyy-MM-dd" /&gt;
+///     &lt;BzColumn Field="Amount" Format="C2" /&gt;
+/// &lt;/BzGrid&gt;
+/// </code></example>
 public partial class BzGrid<TItem> : ComponentBase, IAsyncDisposable
 {
     private static int s_nextId;
@@ -18,69 +36,195 @@ public partial class BzGrid<TItem> : ComponentBase, IAsyncDisposable
     [Inject] private IJSRuntime JS { get; set; } = default!;
 
     // ------------------------------------------------------------------ parameters
+    // Regions name the categories the API docs group members by (see tools/docgen).
 
+    #region Data
+
+    /// <summary>The <see cref="BzColumn{TItem}"/> declarations. Columns render nothing themselves.</summary>
     [Parameter] public RenderFragment? ChildContent { get; set; }
 
-    /// <summary>The data. Replace the list instance (or call <see cref="RefreshAsync"/>) to update.</summary>
+    /// <summary>
+    /// The rows to display. Replace the list instance to load new data, or call <see cref="RefreshAsync"/> after
+    /// changing the same list in place.
+    /// </summary>
+    /// <remarks>With no filter, sort or group active, new data goes straight to rendering: the query engine is not touched.</remarks>
     [Parameter] public IReadOnlyList<TItem>? Items { get; set; }
 
+    /// <summary>
+    /// Where filtering, sorting and grouping are computed. <c>Auto</c> uses .NET for small data and a background
+    /// Web Worker from <see cref="WorkerThreshold"/> rows up.
+    /// </summary>
+    [Parameter] public DataEngineMode Engine { get; set; } = DataEngineMode.Auto;
+
+    /// <summary>Row count at which <see cref="DataEngineMode.Auto"/> switches to the Web Worker engine.</summary>
+    [Parameter] public int WorkerThreshold { get; set; } = 20_000;
+
+    #endregion
+
+    #region Layout & appearance
+
+    /// <summary>Fixed height of every row in pixels. Virtualization relies on rows all being this height.</summary>
     [Parameter] public int RowHeight { get; set; } = 34;
+
+    /// <summary>CSS height of the grid, e.g. <c>"600px"</c> or <c>"calc(100vh - 200px)"</c>. The body scrolls inside it.</summary>
     [Parameter] public string Height { get; set; } = "520px";
+
+    /// <summary>Extra CSS class(es) on the grid's root element. The usual hook for a custom theme.</summary>
     [Parameter] public string? Class { get; set; }
+
+    /// <summary>Inline style on the root element. Handy for overriding a few <c>--bz-*</c> variables.</summary>
     [Parameter] public string? Style { get; set; }
-    /// <summary>Adds class "bz-theme-{Theme}" (built-in: "dark", "compact").</summary>
+
+    /// <summary>Adds the class <c>bz-theme-{Theme}</c>. Built in: <c>"dark"</c> and <c>"compact"</c>.</summary>
     [Parameter] public string? Theme { get; set; }
+
+    /// <summary>Returns extra CSS class(es) for a row, or null.</summary>
+    /// <example><code>RowClass="@(o => o.Status == "Cancelled" ? "row-cancelled" : null)"</code></example>
     [Parameter] public Func<TItem, string?>? RowClass { get; set; }
 
-    /// <summary>0 = no paging (pure virtual scrolling).</summary>
-    [Parameter] public int PageSize { get; set; }
-    [Parameter] public int[] PageSizeOptions { get; set; } = { 25, 50, 100, 250, 1000 };
-
-    [Parameter] public bool ShowGroupPanel { get; set; } = true;
-    [Parameter] public bool GroupsCollapsedByDefault { get; set; }
-
-    /// <summary>When set, layout / sort / filter / group state is persisted to localStorage under this key.</summary>
-    [Parameter] public string? StateKey { get; set; }
-
-    [Parameter] public bool Loading { get; set; }
-    [Parameter] public string LoadingText { get; set; } = "Loading…";
-    [Parameter] public string? LoadingClass { get; set; }
-    [Parameter] public RenderFragment? LoadingTemplate { get; set; }
-    [Parameter] public RenderFragment? EmptyTemplate { get; set; }
-
-    [Parameter] public DataEngineMode Engine { get; set; } = DataEngineMode.Auto;
-    [Parameter] public int WorkerThreshold { get; set; } = 20_000;
+    /// <summary>Rows rendered above and below the visible window, to keep fast scrolling smooth.</summary>
     [Parameter] public int Overscan { get; set; } = 10;
 
+    /// <summary>Content shown when there are no rows to display. Defaults to "No records to display".</summary>
+    [Parameter] public RenderFragment? EmptyTemplate { get; set; }
+
+    #endregion
+
+    #region Loading
+
+    /// <summary>Shows the loading overlay. The grid also shows it on its own when a filter, sort or group query takes over 120 ms.</summary>
+    [Parameter] public bool Loading { get; set; }
+
+    /// <summary>Text of the default loading indicator.</summary>
+    [Parameter] public string LoadingText { get; set; } = "Loading…";
+
+    /// <summary>Extra CSS class on the loading overlay.</summary>
+    [Parameter] public string? LoadingClass { get; set; }
+
+    /// <summary>Replaces the default spinner and text inside the loading overlay.</summary>
+    [Parameter] public RenderFragment? LoadingTemplate { get; set; }
+
+    #endregion
+
+    #region Paging
+
+    /// <summary>Rows per page. <c>0</c> turns paging off: all rows scroll in one virtualized list.</summary>
+    [Parameter] public int PageSize { get; set; }
+
+    /// <summary>Choices offered by the pager's page-size selector.</summary>
+    [Parameter] public int[] PageSizeOptions { get; set; } = { 25, 50, 100, 250, 1000 };
+
+    /// <summary>Numbered page buttons shown in the pager. Pages are shown in fixed blocks (1-10, 11-20, …).</summary>
+    [Parameter] public int PagerButtonCount { get; set; } = 5;
+
+    /// <summary>Shows the page-size selector in the pager.</summary>
+    [Parameter] public bool ShowPageSizeSelector { get; set; } = true;
+
+    #endregion
+
+    #region Grouping
+
+    /// <summary>Shows the panel above the header where columns are dropped to group by them.</summary>
+    [Parameter] public bool ShowGroupPanel { get; set; } = true;
+
+    /// <summary>Starts every group collapsed.</summary>
+    [Parameter] public bool GroupsCollapsedByDefault { get; set; }
+
+    #endregion
+
+    #region State
+
     /// <summary>
-    /// Server mode: the grid does not filter/sort/page locally. Handle <see cref="OnQueryChanged"/>, fetch the page and
-    /// set <see cref="Items"/> + <see cref="TotalCount"/>. Grouping is still applied to the received page.
+    /// Persists the layout to localStorage under this key: column order, width, lock and visibility, sorts, filters,
+    /// groups, group value orders and page size. Null disables persistence.
+    /// </summary>
+    [Parameter] public string? StateKey { get; set; }
+
+    #endregion
+
+    #region Server-side data
+
+    /// <summary>
+    /// The grid stops filtering, sorting and paging locally. Handle <see cref="OnQueryChanged"/>, fetch the requested
+    /// page, then set <see cref="Items"/> and <see cref="TotalCount"/>. Grouping is still applied to the received page.
     /// </summary>
     [Parameter] public bool ServerMode { get; set; }
+
+    /// <summary>Server mode: the total row count across all pages, used by the pager.</summary>
     [Parameter] public int? TotalCount { get; set; }
-    /// <summary>Server mode: supplies multi-select filter values for a field.</summary>
+
+    /// <summary>Server mode: returns the values offered by a multi-select filter, given the column's field.</summary>
     [Parameter] public Func<string, Task<IEnumerable<string>>>? FilterOptionsProvider { get; set; }
 
+    #endregion
+
+    #region Selection
+
+    /// <summary>The highlighted row. Supports <c>@bind-SelectedItem</c>.</summary>
+    [Parameter] public TItem? SelectedItem { get; set; }
+
+    #endregion
+
+    #region Editing
+
+    /// <summary>What opens a row for inline editing. <c>None</c> leaves it to <see cref="BeginEditAsync"/> or the edit command.</summary>
+    [Parameter] public EditTrigger EditTrigger { get; set; } = EditTrigger.DoubleClick;
+
+    /// <summary>Adds a right-locked column with edit, save and cancel buttons.</summary>
+    [Parameter] public bool ShowEditCommands { get; set; }
+
+    #endregion
+
+    // ------------------------------------------------------------------ events
+
+    #region Events
+
+    /// <summary>
+    /// Raised when filters, sorts, groups, the page or the page size change. In <see cref="ServerMode"/> this is
+    /// where you fetch data; <see cref="GridQuery.Reason"/> says what changed.
+    /// </summary>
     [Parameter] public EventCallback<GridQuery> OnQueryChanged { get; set; }
+
+    /// <summary>Raised when a column filter is set or cleared, in both local and server mode.</summary>
     [Parameter] public EventCallback<FilterChangedEventArgs> OnFilterChanged { get; set; }
+
+    /// <summary>Raised whenever the persistable layout changes, with the new <see cref="GridState"/>.</summary>
     [Parameter] public EventCallback<GridState> OnStateChanged { get; set; }
+
+    /// <summary>Raised after new data is painted, with timings. Useful for benchmarking.</summary>
     [Parameter] public EventCallback<GridRenderStats> OnRenderStats { get; set; }
 
-    [Parameter] public TItem? SelectedItem { get; set; }
+    /// <summary>Raised when the selected row changes (the other half of <c>@bind-SelectedItem</c>).</summary>
     [Parameter] public EventCallback<TItem?> SelectedItemChanged { get; set; }
+
+    /// <summary>Raised when a data row is clicked.</summary>
     [Parameter] public EventCallback<RowEventArgs<TItem>> OnRowClick { get; set; }
+
+    /// <summary>Raised when a data row is double-clicked, before edit mode starts.</summary>
     [Parameter] public EventCallback<RowEventArgs<TItem>> OnRowDoubleClick { get; set; }
 
-    [Parameter] public EditTrigger EditTrigger { get; set; } = EditTrigger.DoubleClick;
-    /// <summary>Adds a right-locked column with edit / save / cancel buttons.</summary>
-    [Parameter] public bool ShowEditCommands { get; set; }
+    /// <summary>Raised before a row enters edit mode. Set <see cref="RowEditStartEventArgs{TItem}.Cancel"/> to prevent it.</summary>
     [Parameter] public EventCallback<RowEditStartEventArgs<TItem>> OnRowEditStart { get; set; }
-    /// <summary>Raised before changes are applied. Set Cancel (and Error) to keep the row in edit mode.</summary>
-    [Parameter] public EventCallback<RowEditCommitEventArgs<TItem>> OnRowEditCommit { get; set; }
-    /// <summary>Raised after changes were written to the item — a good place to call your API.</summary>
-    [Parameter] public EventCallback<RowEditCommitEventArgs<TItem>> OnRowUpdated { get; set; }
-    [Parameter] public EventCallback<TItem> OnRowEditCancel { get; set; }
+
+    /// <summary>Raised while editing whenever an editor's value changes (nothing is written to the item yet).</summary>
     [Parameter] public EventCallback<CellValueChangedEventArgs<TItem>> OnCellValueChanged { get; set; }
+
+    /// <summary>
+    /// Raised before changes are written to the item. Set <see cref="RowEditCommitEventArgs{TItem}.Cancel"/> and
+    /// <see cref="RowEditCommitEventArgs{TItem}.Error"/> to keep the row in edit mode, e.g. when validation fails.
+    /// </summary>
+    [Parameter] public EventCallback<RowEditCommitEventArgs<TItem>> OnRowEditCommit { get; set; }
+
+    /// <summary>
+    /// Raised after changes were written to the item: a good place to call your API. Columns bound to read-only
+    /// (computed) properties are not written by the grid; apply those changes here.
+    /// </summary>
+    [Parameter] public EventCallback<RowEditCommitEventArgs<TItem>> OnRowUpdated { get; set; }
+
+    /// <summary>Raised when an edit is cancelled (Esc or the cancel button).</summary>
+    [Parameter] public EventCallback<TItem> OnRowEditCancel { get; set; }
+
+    #endregion
 
     // ------------------------------------------------------------------ fields
 
@@ -134,23 +278,49 @@ public partial class BzGrid<TItem> : ComponentBase, IAsyncDisposable
 
     private Stopwatch? _statsWatch;
 
-    // ------------------------------------------------------------------ public surface used by internal components
+    // ------------------------------------------------------------------ public read-only state
+    // Members marked EditorBrowsable(Never) exist for the grid's internal components and JS callbacks; they are
+    // hidden from IntelliSense and the API docs and may change without notice.
 
-    public int BodyVersion { get; private set; }
+    #region Read-only state
+
+    [EditorBrowsable(EditorBrowsableState.Never)] public int BodyVersion { get; private set; }
+
+    /// <summary>The visible columns in display order (locked left, scrolling, locked right).</summary>
     public IReadOnlyList<ColumnModel<TItem>> VisibleColumns => _visible;
+
+    /// <summary>All registered columns, including hidden ones, in declaration order.</summary>
     public IReadOnlyList<ColumnModel<TItem>> Columns => _columns;
-    public int RowCount => _prefix.Count + _pageLen;
+
+    [EditorBrowsable(EditorBrowsableState.Never)] public int RowCount => _prefix.Count + _pageLen;
+
+    /// <summary>True while the loading overlay is shown (<see cref="Loading"/>, or a query running over 120 ms).</summary>
     public bool IsLoading => Loading || _busyVisible;
+
+    /// <summary>The message shown above the grid when an edit was rejected, or null.</summary>
     public string? EditError { get; private set; }
+
+    /// <summary>The engine currently computing queries: "managed", "worker" or "none".</summary>
     public string EngineName => _engine?.Name ?? "none";
+
     /// <summary>Data rows after filtering (all pages).</summary>
     public int FilteredCount => _result.Count;
+
+    /// <summary>The zero-based current page.</summary>
     public int PageIndex => _page;
+
+    /// <summary>The current page size (0 when paging is off). May differ from <see cref="PageSize"/> once the user picks another.</summary>
     public int CurrentPageSize => _pageSize;
+
+    /// <summary>True when at least one grouping is active.</summary>
     public bool HasGroups => _groups.Count > 0;
+    private bool HasFooter => _visible.Any(c => c.Def.FooterTemplate is not null);
+    /// <summary>Data rows on the current page.</summary>
+    public int CurrentPageRowCount => _pageSize > 0 ? Math.Max(0, Math.Min(_pageSize, TotalItemCount - _page * _pageSize)) : TotalItemCount;
     internal ElementReference ScrollerRef => _scroller;
     internal IJSObjectReference? Module => _module;
 
+    /// <summary>Number of pages (1 when paging is off).</summary>
     public int PageCount
     {
         get
@@ -161,11 +331,14 @@ public partial class BzGrid<TItem> : ComponentBase, IAsyncDisposable
         }
     }
 
+    /// <summary>Total data rows across all pages: <see cref="TotalCount"/> in server mode, else the filtered count.</summary>
     public int TotalItemCount => ServerMode ? (TotalCount ?? _items.Count) : _result.Count;
 
-    public TItem ItemAt(int index) => _items[index];
+    #endregion
 
-    public GridRow GetRow(int i)
+    [EditorBrowsable(EditorBrowsableState.Never)] public TItem ItemAt(int index) => _items[index];
+
+    [EditorBrowsable(EditorBrowsableState.Never)] public GridRow GetRow(int i)
     {
         if (i < _prefix.Count) return GridRow.ForGroup(_nodes[_prefix[i]], true);
         int f = _pageStart + i - _prefix.Count;
@@ -176,7 +349,7 @@ public partial class BzGrid<TItem> : ComponentBase, IAsyncDisposable
 
     private int ViewToItem(int p) => _result.View is null ? p : _result.View[p];
 
-    public string RowCss(TItem item, int displayIndex)
+    [EditorBrowsable(EditorBrowsableState.Never)] public string RowCss(TItem item, int displayIndex)
     {
         var css = (displayIndex & 1) == 1 ? "bz-row bz-alt" : "bz-row";
         if (_hasSelected && EqualityComparer<TItem>.Default.Equals(item, _selected)) css += " bz-selected";
@@ -184,17 +357,27 @@ public partial class BzGrid<TItem> : ComponentBase, IAsyncDisposable
         return string.IsNullOrEmpty(extra) ? css : css + " " + extra;
     }
 
-    public bool IsEditing(int itemIndex) => itemIndex == _editIndex;
+    [EditorBrowsable(EditorBrowsableState.Never)] public bool IsEditing(int itemIndex) => itemIndex == _editIndex;
 
-    public SortDescriptor? SortFor(ColumnModel<TItem> col) => _sorts.FirstOrDefault(s => s.Field == col.Key);
-    public int SortIndex(ColumnModel<TItem> col) => _sorts.FindIndex(s => s.Field == col.Key);
-    public int SortCount => _sorts.Count;
-    public ColumnFilter? FilterFor(ColumnModel<TItem> col) => _filters.GetValueOrDefault(col.Key);
-    public bool IsGrouped(ColumnModel<TItem> col) => _groups.Any(g => g.Field == col.Key);
+    [EditorBrowsable(EditorBrowsableState.Never)] public SortDescriptor? SortFor(ColumnModel<TItem> col) => _sorts.FirstOrDefault(s => s.Field == col.Key);
+    [EditorBrowsable(EditorBrowsableState.Never)] public int SortIndex(ColumnModel<TItem> col) => _sorts.FindIndex(s => s.Field == col.Key);
+    [EditorBrowsable(EditorBrowsableState.Never)] public int SortCount => _sorts.Count;
+    [EditorBrowsable(EditorBrowsableState.Never)] public ColumnFilter? FilterFor(ColumnModel<TItem> col) => _filters.GetValueOrDefault(col.Key);
+    [EditorBrowsable(EditorBrowsableState.Never)] public bool IsGrouped(ColumnModel<TItem> col) => _groups.Any(g => g.Field == col.Key);
+    /// <summary>Active groupings, outermost first.</summary>
     public IReadOnlyList<SortDescriptor> Groups => _groups;
+
+    /// <summary>Active sorts, highest priority first.</summary>
     public IReadOnlyList<SortDescriptor> Sorts => _sorts;
+
+    /// <summary>Active column filters.</summary>
     public IReadOnlyCollection<ColumnFilter> Filters => _filters.Values;
 
+    /// <summary>
+    /// Finds a column by key (its <see cref="BzColumn{TItem}.Field"/>, else its Title). Most methods that act on a
+    /// column take the <see cref="ColumnModel{TItem}"/> returned here.
+    /// </summary>
+    /// <example><code>await grid.SetSortAsync(grid.FindColumn("OrderDate")!, SortDirection.Descending);</code></example>
     public ColumnModel<TItem>? FindColumn(string key)
     {
         foreach (var c in _columns) if (!c.Removed && c.Key == key) return c;
@@ -312,7 +495,7 @@ public partial class BzGrid<TItem> : ComponentBase, IAsyncDisposable
 
     // ------------------------------------------------------------------ data pipeline
 
-    /// <summary>Re-reads the current Items (e.g. after mutating the list in place).</summary>
+    /// <summary>Re-reads the current <see cref="Items"/>, e.g. after adding or removing rows in the same list instance.</summary>
     public async Task RefreshAsync()
     {
         if (_started) await ApplyDataAsync();
@@ -650,6 +833,10 @@ public partial class BzGrid<TItem> : ComponentBase, IAsyncDisposable
         await SetSortAsync(col, next, append: e.ShiftKey);
     }
 
+    /// <summary>Sorts by a column. Users do the same by clicking a header (Shift+click adds a sort).</summary>
+    /// <param name="col">The column, from <see cref="FindColumn"/>.</param>
+    /// <param name="direction">The direction, or null to remove this column's sort.</param>
+    /// <param name="append">Keep the other sorts and add (or update) this one, instead of replacing them.</param>
     public async Task SetSortAsync(ColumnModel<TItem> col, SortDirection? direction, bool append = false)
     {
         var existing = _sorts.FirstOrDefault(s => s.Field == col.Key);
@@ -660,6 +847,16 @@ public partial class BzGrid<TItem> : ComponentBase, IAsyncDisposable
         await QueryChangedAsync("sort");
     }
 
+    /// <summary>Sets or clears a column's filter.</summary>
+    /// <param name="col">The column, from <see cref="FindColumn"/>.</param>
+    /// <param name="filter">The filter, or null (or an inactive filter) to clear it. <see cref="ColumnFilter.Field"/> is filled in for you.</param>
+    /// <example><code>
+    /// await grid.SetFilterAsync(grid.FindColumn("Status")!, new ColumnFilter
+    /// {
+    ///     Kind = FilterKind.MultiSelect,
+    ///     Values = new() { "New", "Processing" }
+    /// });
+    /// </code></example>
     public async Task SetFilterAsync(ColumnModel<TItem> col, ColumnFilter? filter)
     {
         if (filter is null || !filter.IsActive) _filters.Remove(col.Key);
@@ -671,12 +868,16 @@ public partial class BzGrid<TItem> : ComponentBase, IAsyncDisposable
         await QueryChangedAsync("filter", changedFilterField: col.Key);
     }
 
+    /// <summary>Removes every column filter.</summary>
     public async Task ClearFiltersAsync()
     {
         _filters.Clear();
         await QueryChangedAsync("filter", changedFilterField: "");
     }
 
+    /// <summary>Groups by a column. Ignored if the column is not groupable or already grouped.</summary>
+    /// <param name="col">The column, from <see cref="FindColumn"/>.</param>
+    /// <param name="index">Position among the groupings (0 = outermost); -1 adds it innermost.</param>
     public async Task GroupByAsync(ColumnModel<TItem> col, int index = -1)
     {
         if (!col.CanGroup || IsGrouped(col)) return;
@@ -685,12 +886,14 @@ public partial class BzGrid<TItem> : ComponentBase, IAsyncDisposable
         await QueryChangedAsync("group");
     }
 
+    /// <summary>Removes the grouping on a column key.</summary>
     public async Task UngroupAsync(string field)
     {
         _groups.RemoveAll(g => g.Field == field);
         await QueryChangedAsync("group");
     }
 
+    /// <summary>Flips a grouping between ascending and descending.</summary>
     public async Task ToggleGroupDirectionAsync(string field)
     {
         var g = _groups.FirstOrDefault(x => x.Field == field);
@@ -699,6 +902,7 @@ public partial class BzGrid<TItem> : ComponentBase, IAsyncDisposable
         await QueryChangedAsync("group");
     }
 
+    /// <summary>Moves a grouping outward (negative <paramref name="delta"/>) or inward (positive).</summary>
     public async Task MoveGroupAsync(string field, int delta)
     {
         int i = _groups.FindIndex(g => g.Field == field);
@@ -708,6 +912,7 @@ public partial class BzGrid<TItem> : ComponentBase, IAsyncDisposable
         await QueryChangedAsync("group");
     }
 
+    /// <summary>Expands or collapses every group.</summary>
     public void SetAllGroupsCollapsed(bool collapsed)
     {
         _collapseDefault = collapsed;
@@ -718,11 +923,11 @@ public partial class BzGrid<TItem> : ComponentBase, IAsyncDisposable
         _ = RefreshViewportAsync(false);
     }
 
-    /// <summary>The explicit order of group values for a column: user order from the menu, else the column's GroupOrder.</summary>
+    /// <summary>The explicit order of group values for a column: the user's order from the menu, else the column's GroupOrder.</summary>
     public IReadOnlyList<string>? EffectiveGroupOrder(ColumnModel<TItem> col) =>
         _groupOrders.TryGetValue(col.Key, out var o) ? o : col.Def.GroupOrder;
 
-    public bool HasUserGroupOrder(ColumnModel<TItem> col) => _groupOrders.ContainsKey(col.Key);
+    [EditorBrowsable(EditorBrowsableState.Never)] public bool HasUserGroupOrder(ColumnModel<TItem> col) => _groupOrders.ContainsKey(col.Key);
 
     private string[]? EffectiveGroupOrderArray(ColumnModel<TItem> col) => EffectiveGroupOrder(col)?.ToArray();
 
@@ -735,6 +940,7 @@ public partial class BzGrid<TItem> : ComponentBase, IAsyncDisposable
         else SaveState();
     }
 
+    /// <summary>Locks a column to the left or right edge, or unlocks it.</summary>
     public async Task SetLockAsync(ColumnModel<TItem> col, ColumnLock lockSide)
     {
         col.Lock = lockSide;
@@ -744,6 +950,7 @@ public partial class BzGrid<TItem> : ComponentBase, IAsyncDisposable
         await Task.CompletedTask;
     }
 
+    /// <summary>Shows or hides a column.</summary>
     public void SetVisible(ColumnModel<TItem> col, bool visible)
     {
         col.Visible = visible;
@@ -752,6 +959,7 @@ public partial class BzGrid<TItem> : ComponentBase, IAsyncDisposable
         StateHasChanged();
     }
 
+    /// <summary>Makes every column visible.</summary>
     public void ShowAllColumns()
     {
         foreach (var c in _columns) if (!c.Removed) c.Visible = true;
@@ -760,6 +968,7 @@ public partial class BzGrid<TItem> : ComponentBase, IAsyncDisposable
         StateHasChanged();
     }
 
+    /// <summary>Sizes a column (or, with null, every column) to fit its header and a sample of its data.</summary>
     public async Task AutoFitAsync(ColumnModel<TItem>? col = null)
     {
         await AutoSizeAsync(col is null ? _columns : new[] { col }, markFixed: true);
@@ -769,6 +978,7 @@ public partial class BzGrid<TItem> : ComponentBase, IAsyncDisposable
 
     // ------------------------------------------------------------------ paging
 
+    /// <summary>Goes to a zero-based page (clamped to the valid range).</summary>
     public async Task SetPageAsync(int page)
     {
         page = Math.Clamp(page, 0, PageCount - 1);
@@ -786,6 +996,7 @@ public partial class BzGrid<TItem> : ComponentBase, IAsyncDisposable
         await RaiseQueryAsync("page");
     }
 
+    /// <summary>Changes the page size (0 turns paging off) and returns to the first page.</summary>
     public async Task SetPageSizeAsync(int size)
     {
         _pageSize = Math.Max(0, size);
@@ -809,6 +1020,7 @@ public partial class BzGrid<TItem> : ComponentBase, IAsyncDisposable
 
     // ------------------------------------------------------------------ query change plumbing
 
+    /// <summary>A snapshot of the current filters, sorts, groups and page, e.g. to send to an API.</summary>
     public GridQuery CurrentQuery(string reason = "") => new()
     {
         Filters = _filters.Values.Select(f => f.Clone()).ToList(),
@@ -842,7 +1054,7 @@ public partial class BzGrid<TItem> : ComponentBase, IAsyncDisposable
     private Task RaiseQueryAsync(string reason) =>
         OnQueryChanged.HasDelegate ? OnQueryChanged.InvokeAsync(CurrentQuery(reason)) : Task.CompletedTask;
 
-    public async Task<List<DistinctValue>> GetDistinctValuesAsync(ColumnModel<TItem> col)
+    [EditorBrowsable(EditorBrowsableState.Never)] public async Task<List<DistinctValue>> GetDistinctValuesAsync(ColumnModel<TItem> col)
     {
         if (ServerMode && FilterOptionsProvider is not null)
             return (await FilterOptionsProvider(col.Key)).Select(v => new DistinctValue { T = v }).ToList();
@@ -852,6 +1064,7 @@ public partial class BzGrid<TItem> : ComponentBase, IAsyncDisposable
 
     // ------------------------------------------------------------------ editing
 
+    /// <summary>Puts the row showing <paramref name="item"/> into edit mode (any row being edited is committed first).</summary>
     public async Task BeginEditAsync(TItem item)
     {
         for (int i = 0; i < _items.Count; i++)
@@ -883,6 +1096,8 @@ public partial class BzGrid<TItem> : ComponentBase, IAsyncDisposable
         StateHasChanged();
     }
 
+    /// <summary>Saves the row being edited, raising <see cref="OnRowEditCommit"/> then <see cref="OnRowUpdated"/>.</summary>
+    /// <returns>False if the commit was cancelled or a value could not be converted; the row stays in edit mode.</returns>
     public async Task<bool> CommitEditAsync()
     {
         if (_editIndex < 0) return true;
@@ -930,6 +1145,7 @@ public partial class BzGrid<TItem> : ComponentBase, IAsyncDisposable
         return true;
     }
 
+    /// <summary>Discards the row being edited.</summary>
     public async Task CancelEditAsync()
     {
         if (_editIndex < 0) return;
@@ -946,9 +1162,9 @@ public partial class BzGrid<TItem> : ComponentBase, IAsyncDisposable
         StateHasChanged();
     }
 
-    public object? GetEditValue(ColumnModel<TItem> col) => _editValues.GetValueOrDefault(col.Key);
+    [EditorBrowsable(EditorBrowsableState.Never)] public object? GetEditValue(ColumnModel<TItem> col) => _editValues.GetValueOrDefault(col.Key);
 
-    public void SetEditValue(ColumnModel<TItem> col, object? raw)
+    [EditorBrowsable(EditorBrowsableState.Never)] public void SetEditValue(ColumnModel<TItem> col, object? raw)
     {
         if (_editIndex < 0) return;
         try
@@ -971,15 +1187,15 @@ public partial class BzGrid<TItem> : ComponentBase, IAsyncDisposable
         }
     }
 
-    public CellEditContext<TItem> EditContextFor(ColumnModel<TItem> col) =>
+    [EditorBrowsable(EditorBrowsableState.Never)] public CellEditContext<TItem> EditContextFor(ColumnModel<TItem> col) =>
         new(_items[_editIndex], col.Key, () => GetEditValue(col), v => SetEditValue(col, v));
 
     // ------------------------------------------------------------------ JS callbacks
 
-    [JSInvokable]
+    [JSInvokable, EditorBrowsable(EditorBrowsableState.Never)]
     public void OnViewport(int start, int end) => _body?.SetViewport(start, end);
 
-    [JSInvokable]
+    [JSInvokable, EditorBrowsable(EditorBrowsableState.Never)]
     public async Task OnRowEvent(string type, int row, bool ctrl, bool shift)
     {
         if (row < 0 || row >= RowCount) return;
@@ -1007,7 +1223,7 @@ public partial class BzGrid<TItem> : ComponentBase, IAsyncDisposable
         }
     }
 
-    [JSInvokable]
+    [JSInvokable, EditorBrowsable(EditorBrowsableState.Never)]
     public async Task OnRowAction(string action, int row)
     {
         if (row < 0 || row >= RowCount) return;
@@ -1021,7 +1237,7 @@ public partial class BzGrid<TItem> : ComponentBase, IAsyncDisposable
         }
     }
 
-    [JSInvokable]
+    [JSInvokable, EditorBrowsable(EditorBrowsableState.Never)]
     public async Task OnGroupToggle(int row)
     {
         if (row < 0 || row >= RowCount) return;
@@ -1035,7 +1251,7 @@ public partial class BzGrid<TItem> : ComponentBase, IAsyncDisposable
         await RefreshViewportAsync(false);
     }
 
-    [JSInvokable]
+    [JSInvokable, EditorBrowsable(EditorBrowsableState.Never)]
     public Task OnColumnResized(string key, double width)
     {
         var col = FindColumn(key);
@@ -1049,14 +1265,14 @@ public partial class BzGrid<TItem> : ComponentBase, IAsyncDisposable
         return Task.CompletedTask;
     }
 
-    [JSInvokable]
+    [JSInvokable, EditorBrowsable(EditorBrowsableState.Never)]
     public Task OnAutoFit(string key)
     {
         var col = FindColumn(key);
         return col is null ? Task.CompletedTask : AutoFitAsync(col);
     }
 
-    [JSInvokable]
+    [JSInvokable, EditorBrowsable(EditorBrowsableState.Never)]
     public Task OnColumnMoved(string key, string targetKey, bool before)
     {
         var src = FindColumn(key);
@@ -1075,7 +1291,7 @@ public partial class BzGrid<TItem> : ComponentBase, IAsyncDisposable
         return Task.CompletedTask;
     }
 
-    [JSInvokable]
+    [JSInvokable, EditorBrowsable(EditorBrowsableState.Never)]
     public Task OnGroupDrop(string key)
     {
         var col = FindColumn(key);
@@ -1099,6 +1315,7 @@ public partial class BzGrid<TItem> : ComponentBase, IAsyncDisposable
 
     // ------------------------------------------------------------------ state
 
+    /// <summary>The current persistable layout. Serialize it to save layouts server-side.</summary>
     public GridState GetState() => new()
     {
         Columns = _columns.Where(c => !c.Removed).Select(c => new ColumnState
@@ -1112,6 +1329,7 @@ public partial class BzGrid<TItem> : ComponentBase, IAsyncDisposable
         PageSize = _pageSize
     };
 
+    /// <summary>Applies a layout previously returned by <see cref="GetState"/>. Entries for unknown columns are ignored.</summary>
     public async Task SetStateAsync(GridState state)
     {
         ApplyState(state);
@@ -1120,7 +1338,7 @@ public partial class BzGrid<TItem> : ComponentBase, IAsyncDisposable
         await RunQueryAsync(resetScroll: true);
     }
 
-    /// <summary>Clears persisted state and restores the column definitions' defaults.</summary>
+    /// <summary>Clears persisted state and restores the defaults from the column definitions.</summary>
     public async Task ResetStateAsync()
     {
         foreach (var c in _columns) c.ResetLayout();

@@ -1,0 +1,11 @@
+[
+  { "slug": "getting-started", "title": "Getting started", "summary": "Add the package, the stylesheet and your first grid." },
+  { "slug": "columns", "title": "Columns & templates", "summary": "Fields, formats, widths, locking and every kind of template." },
+  { "slug": "sort-filter-group", "title": "Sorting, filtering & grouping", "summary": "What users can do, and how to do the same from code." },
+  { "slug": "editing", "title": "Inline editing", "summary": "Edit triggers, custom editors, validation and saving." },
+  { "slug": "paging-server", "title": "Paging & server-side data", "summary": "Client paging, or let your API filter, sort and page." },
+  { "slug": "state", "title": "Saving layouts", "summary": "Persist column layout, sorts, filters and groups." },
+  { "slug": "styling", "title": "Styling & themes", "summary": "CSS variables, themes, class hooks and conditional formatting." },
+  { "slug": "performance", "title": "Performance", "summary": "Where time goes between the API response and pixels on screen." },
+  { "slug": "telerik", "title": "Coming from Telerik", "summary": "TelerikGrid features mapped to BlazeGrid, and the gaps." }
+]

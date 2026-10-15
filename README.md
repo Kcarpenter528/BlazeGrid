@@ -5,7 +5,24 @@ A virtualized data grid for Blazor WebAssembly, built for the shortest path from
 ```
 src/BlazeGrid/              Razor class library (the package)
 samples/BlazeGrid.Demo/     Standalone WASM demo + benchmark harness (100k–500k rows, server mode)
+docs/                       API reference + guides (static site, GitHub Pages)
+tools/DocGen/               Generates docs/data/api.json from the library
 ```
+
+## Documentation
+
+The full API reference and guides live in [`docs/`](docs/): a static site with search, one page per type, and guides for
+columns, filtering, editing, server mode, state, styling, performance and migrating from Telerik.
+
+- **Preview locally**: `python -m http.server 5180 --directory docs`, then open http://localhost:5180. It reads JSON, so opening `index.html` as a file won't work.
+- **After changing the public API** (parameters, methods, XML comments, `#region` names, or `--bz-*` variables in `bzgrid.css`), regenerate the data:
+
+  ```bash
+  dotnet run --project tools/DocGen
+  ```
+
+  It warns about public members without a `<summary>`. Members marked `[EditorBrowsable(EditorBrowsableState.Never)]` are internal plumbing and are left out.
+- **Guides** are Markdown files in `docs/guides/`, listed in `docs/guides/guides.json`.
 
 ## Quick start
 
