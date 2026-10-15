@@ -1,0 +1,204 @@
+@namespace BlazeGrid.Internal
+@typeparam TItem
+
+@{
+    var g = Grid;
+    int total = g.RowCount;
+    int rh = g.RowHeight;
+    int start = Math.Min(_start, total);
+    int end = Math.Min(_end, total);
+    var cols = g.VisibleColumns;
+}
+<div class="bz-body" role="rowgroup" style="height:@(total * rh)px;padding-top:@(start * rh)px">
+    @for (int i = start; i < end; i++)
+    {
+        var row = g.GetRow(i);
+        if (row.IsGroup)
+        {
+            var node = row.Group!;
+            <div @key="@(row.Continued ? node.KeyContinued : node.KeyNormal)" class="@(node.Collapsed && !row.Continued ? "bz-row bz-grow bz-collapsed" : "bz-row bz-grow")" data-g="@i" role="row">
+                <div class="bz-gcell" style="padding-left:@(10 + node.Level * 20)px">
+                    <span class="bz-gtoggle"></span>
+                    <span class="bz-gtitle">@node.Title:</span>
+                    <span class="bz-gkey">@(node.Text.Length == 0 ? "(Blank)" : node.Text)</span>
+                    <span class="bz-gcount">@node.Count.ToString("N0")</span>
+                    @if (row.Continued)
+                    {
+                        <span class="bz-gcont">continued</span>
+                    }
+                </div>
+            </div>
+        }
+        else
+        {
+            int idx = row.ItemIndex;
+            var item = g.ItemAt(idx);
+            if (g.IsEditing(idx))
+            {
+                // Distinct key: reusing the read-only row's element (different template position, same key)
+                // makes Blazor diff attributes by sequence and drop the shared ones.
+                var editCss = g.RowCss(item, i) + " bz-editing";
+                <div @key="~idx" class="@editCss" data-r="@i" role="row">
+                    @foreach (var col in cols)
+                    {
+                        <div class="@(col.CellCss + " bz-ecell")" style="@col.CellStyle">
+                            @if (col.IsCommand)
+                            {
+                                <button type="button" class="bz-cmd bz-cmd-save" data-act="save" title="Save (Enter)">✓</button>
+                                <button type="button" class="bz-cmd" data-act="cancel" title="Cancel (Esc)">✕</button>
+                            }
+                            else if (col.CanEdit && col.Def.EditTemplate is not null)
+                            {
+                                @col.Def.EditTemplate(g.EditContextFor(col))
+                            }
+                            else if (col.CanEdit)
+                            {
+                                @Editor(col)
+                            }
+                            else
+                            {
+                                @CellContent(col, item)
+                            }
+                        </div>
+                    }
+                </div>
+            }
+            else
+            {
+                <div @key="idx" class="@g.RowCss(item, i)" data-r="@i" role="row">
+                    @foreach (var col in cols)
+                    {
+                        <div class="@(col.Def.CellClassSelector is null ? col.CellCss : col.CellCss + " " + col.Def.CellClassSelector(item))" style="@col.CellStyle" role="gridcell">
+                            @if (col.IsCommand)
+                            {
+                                <button type="button" class="bz-cmd" data-act="edit" title="Edit">✎</button>
+                            }
+                            else if (col.Def.Template is not null)
+                            {
+                                @col.Def.Template(item)
+                            }
+                            else if (col.Html is not null)
+                            {
+                                @((MarkupString)col.RenderHtml(item))
+                            }
+                            else
+                            {
+                                @col.GetText(item)
+                            }
+                        </div>
+                    }
+                </div>
+            }
+        }
+    }
+</div>
+@if (total == 0 && !g.IsLoading)
+{
+    <div class="bz-empty">
+        @if (g.EmptyTemplate is not null)
+        {
+            @g.EmptyTemplate
+        }
+        else
+        {
+            <span>No records to display</span>
+        }
+    </div>
+}
+
+@code {
+    [Parameter] public BzGrid<TItem> Grid { get; set; } = default!;
+
+    private int _start;
+    private int _end = 60;
+    private int _renderedVersion = -1;
+    private bool _force;
+
+    protected override bool ShouldRender()
+    {
+        if (!_force && _renderedVersion == Grid.BodyVersion) return false;
+        _force = false;
+        _renderedVersion = Grid.BodyVersion;
+        return true;
+    }
+
+    public void SetViewport(int start, int end)
+    {
+        if (start == _start && end == _end) return;
+        _start = start;
+        _end = end;
+        _force = true;
+        StateHasChanged();
+    }
+
+    public void Refresh()
+    {
+        _force = true;
+        StateHasChanged();
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (Grid.FocusEditorPending && Grid.Module is not null)
+        {
+            Grid.FocusEditorPending = false;
+            await Grid.Module.InvokeVoidAsync("focusEditor", Grid.ScrollerRef);
+        }
+    }
+
+    private RenderFragment CellContent(ColumnModel<TItem> col, TItem item) => __builder =>
+    {
+        if (col.Def.Template is not null)
+        {
+            __builder.AddContent(0, col.Def.Template(item));
+        }
+        else if (col.Html is not null)
+        {
+            __builder.AddMarkupContent(1, col.RenderHtml(item));
+        }
+        else
+        {
+            __builder.AddContent(2, col.GetText(item));
+        }
+    };
+
+    private static readonly CultureInfo Inv = CultureInfo.InvariantCulture;
+
+    private RenderFragment Editor(ColumnModel<TItem> col)
+    {
+        var value = Grid.GetEditValue(col);
+        if (col.IsBool)
+        {
+            return @<input type="checkbox" class="bz-editor-check" checked="@(value is true)" @onchange="e => Grid.SetEditValue(col, e.Value)" />;
+        }
+        if (col.IsEnum)
+        {
+            var names = Enum.GetNames(col.EnumType!);
+            var cur = value?.ToString();
+            return @<select class="bz-editor" @onchange="e => Grid.SetEditValue(col, e.Value)">
+                @foreach (var n in names)
+                {
+                    <option value="@n" selected="@(n == cur)">@n</option>
+                }
+            </select>;
+        }
+        if (col.IsDate)
+        {
+            string? s = value switch
+            {
+                DateTime d => d.ToString("yyyy-MM-dd", Inv),
+                DateTimeOffset o => o.ToString("yyyy-MM-dd", Inv),
+                DateOnly d => d.ToString("yyyy-MM-dd", Inv),
+                _ => null
+            };
+            return @<input type="date" class="bz-editor" value="@s" @onchange="e => Grid.SetEditValue(col, e.Value)" />;
+        }
+        if (col.IsNumeric)
+        {
+            var s = Convert.ToString(value, Inv);
+            return @<input type="number" step="any" class="bz-editor bz-right" value="@s" @onchange="e => Grid.SetEditValue(col, e.Value)" />;
+        }
+        var text = value?.ToString();
+        return @<input type="text" class="bz-editor" value="@text" @onchange="e => Grid.SetEditValue(col, e.Value)" />;
+    }
+}

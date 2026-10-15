@@ -1,0 +1,58 @@
+@page "/server"
+
+<PageTitle>BlazeGrid · Server mode</PageTitle>
+
+<p class="intro">
+    <b>ServerMode</b>: filters, sorts and paging raise <code>OnQueryChanged</code>; this page sends the
+    <code>GridQuery</code> to a fake API (350&nbsp;ms latency, 200k rows) and binds the returned page.
+    Grouping is applied locally to the received page.
+</p>
+
+<BzGrid TItem="Order" Items="_page" TotalCount="_total" ServerMode="true" PageSize="100" Loading="_loading"
+        LoadingText="Fetching from API…" StateKey="demo-server" Height="calc(100vh - 220px)"
+        OnQueryChanged="Fetch" FilterOptionsProvider="FakeOrderApi.DistinctAsync">
+    <BzColumn Field="Id" Title="#" Locked="ColumnLock.Left" Format="N0" />
+    <BzColumn Field="Customer" Filter="FilterKind.MultiSelect" />
+    <BzColumn Field="Region" Filter="FilterKind.MultiSelect" />
+    <BzColumn Field="Product" />
+    <BzColumn Field="Status" />
+    <BzColumn Field="OrderDate" Title="Order date" Format="yyyy-MM-dd" />
+    <BzColumn Field="Quantity" Title="Qty" />
+    <BzColumn Field="Amount" Format="C2" />
+    <BzColumn Field="SalesRep" Title="Rep" />
+</BzGrid>
+
+<section class="log">
+    <b>Last query sent to API</b>
+    <div><code>@_lastQuery</code></div>
+</section>
+
+@code {
+    private IReadOnlyList<Order>? _page;
+    private int _total;
+    private bool _loading;
+    private string _lastQuery = "";
+
+    protected override Task OnInitializedAsync() => Fetch(new GridQuery { PageSize = 100, Reason = "initial" });
+
+    private async Task Fetch(GridQuery q)
+    {
+        _lastQuery = $"reason={q.Reason} page={q.Page} size={q.PageSize} filters=[{string.Join("; ", q.Filters.Select(Describe))}] " +
+                     $"sorts=[{string.Join(", ", q.Sorts.Select(s => s.Field + " " + s.Direction))}]";
+        _loading = true;
+        StateHasChanged();
+        var r = await FakeOrderApi.QueryAsync(q);
+        _page = r.Items;
+        _total = r.Total;
+        _loading = false;
+    }
+
+    private static string Describe(ColumnFilter f) => f.Kind switch
+    {
+        FilterKind.MultiSelect => $"{f.Field} in ({f.Values?.Count} values)",
+        FilterKind.Text => $"{f.Field} {f.TextOperator} '{f.Text}'",
+        FilterKind.Number => $"{f.Field} {f.Operator} {f.Number}",
+        FilterKind.Date => $"{f.Field} {f.Operator} {f.Date:yyyy-MM-dd}",
+        _ => f.Field
+    };
+}

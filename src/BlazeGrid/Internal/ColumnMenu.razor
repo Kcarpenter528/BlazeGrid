@@ -1,0 +1,372 @@
+@namespace BlazeGrid.Internal
+@typeparam TItem
+@implements IDisposable
+
+<div class="bz-menu-backdrop" @onclick="Close" @oncontextmenu="Close" @oncontextmenu:preventDefault></div>
+<div class="bz-menu" @ref="_el" style="left:@(X.ToString(CultureInfo.InvariantCulture))px;top:@(Y.ToString(CultureInfo.InvariantCulture))px" @onkeydown="OnKey">
+    <div class="bz-menu-head">@Column.Title</div>
+
+    @if (Column.CanSort)
+    {
+        var s = Grid.SortFor(Column);
+        <div class="bz-menu-row">
+            <button type="button" class="@Btn(s?.Direction == SortDirection.Ascending)" @onclick="() => Do(Grid.SetSortAsync(Column, SortDirection.Ascending))">▲ Asc</button>
+            <button type="button" class="@Btn(s?.Direction == SortDirection.Descending)" @onclick="() => Do(Grid.SetSortAsync(Column, SortDirection.Descending))">▼ Desc</button>
+            <button type="button" class="bz-mbtn" disabled="@(s is null)" @onclick="() => Do(Grid.SetSortAsync(Column, null))">Clear</button>
+        </div>
+    }
+
+    <div class="bz-menu-row">
+        <button type="button" class="@Btn(Column.Lock == ColumnLock.Left)" @onclick="() => Do(Grid.SetLockAsync(Column, ColumnLock.Left))">⇤ Lock left</button>
+        <button type="button" class="@Btn(Column.Lock == ColumnLock.Right)" @onclick="() => Do(Grid.SetLockAsync(Column, ColumnLock.Right))">Lock right ⇥</button>
+        <button type="button" class="bz-mbtn" disabled="@(Column.Lock == ColumnLock.None)" @onclick="() => Do(Grid.SetLockAsync(Column, ColumnLock.None))">Unlock</button>
+    </div>
+
+    <div class="bz-menu-row">
+        @if (Column.CanGroup)
+        {
+            if (Grid.IsGrouped(Column))
+            {
+                <button type="button" class="bz-mbtn bz-on" @onclick="() => Do(Grid.UngroupAsync(Column.Key))">Ungroup</button>
+            }
+            else
+            {
+                <button type="button" class="bz-mbtn" @onclick="() => Do(Grid.GroupByAsync(Column))">Group by</button>
+            }
+        }
+        <button type="button" class="bz-mbtn" @onclick="() => Do(Grid.AutoFitAsync(Column))">Fit width</button>
+        <button type="button" class="bz-mbtn" @onclick="() => Do(Grid.AutoFitAsync())">Fit all</button>
+    </div>
+    <div class="bz-menu-row">
+        <button type="button" class="bz-mbtn" @onclick="() => { Grid.SetVisible(Column, false); Close(); }">Hide column</button>
+        @if (Grid.Columns.Any(c => !c.Visible && !c.Removed))
+        {
+            <button type="button" class="bz-mbtn" @onclick="() => { Grid.ShowAllColumns(); Close(); }">Show all columns</button>
+        }
+    </div>
+
+    @if (Column.CanGroup)
+    {
+        <div class="bz-menu-sep"></div>
+        <button type="button" class="bz-section-toggle" @onclick="ToggleGroupOrder">
+            <span>@(_showOrder ? "▾" : "▸") Group order</span>
+            <span class="bz-muted">@(Grid.HasUserGroupOrder(Column) ? "custom" : Column.Def.GroupOrder is not null ? "preset" : "A → Z")</span>
+        </button>
+        @if (_showOrder)
+        {
+            if (_values is null)
+            {
+                <div class="bz-muted bz-pad">Loading values…</div>
+            }
+            else
+            {
+                <div class="bz-olist">
+                    @for (int i = 0; i < _order.Count; i++)
+                    {
+                        var idx = i;
+                        var v = _order[i];
+                        <div class="@(_dragIndex == idx ? "bz-oitem bz-dragging" : _overIndex == idx ? "bz-oitem bz-over" : "bz-oitem")" draggable="true"
+                             @ondragstart="() => _dragIndex = idx"
+                             @ondragover="() => _overIndex = idx" @ondragover:preventDefault
+                             @ondrop="() => DropOn(idx)" @ondragend="() => { _dragIndex = -1; _overIndex = -1; }">
+                            <span class="bz-grip">⋮⋮</span>
+                            <span class="bz-oval">@(v.Length == 0 ? "(Blank)" : v)</span>
+                            <button type="button" class="bz-chip-btn" disabled="@(idx == 0)" @onclick="() => Move(idx, -1)">▲</button>
+                            <button type="button" class="bz-chip-btn" disabled="@(idx == _order.Count - 1)" @onclick="() => Move(idx, 1)">▼</button>
+                        </div>
+                    }
+                </div>
+                <div class="bz-menu-actions">
+                    <button type="button" class="bz-mbtn" @onclick="ResetGroupOrder">Reset</button>
+                    <button type="button" class="bz-mbtn bz-primary" @onclick="SaveGroupOrder">Save order</button>
+                </div>
+            }
+        }
+    }
+
+    @if (Column.CanFilter)
+    {
+        <div class="bz-menu-sep"></div>
+        <div class="bz-filter">
+            @switch (Column.Kind)
+            {
+                case FilterKind.Text:
+                    <select class="bz-input" @bind="_f.TextOperator">
+                        @foreach (var op in Enum.GetValues<TextOperator>())
+                        {
+                            <option value="@op">@Label(op)</option>
+                        }
+                    </select>
+                    @if (_f.TextOperator is not (TextOperator.Empty or TextOperator.NotEmpty))
+                    {
+                        <input class="bz-input" placeholder="Search…" @bind="_f.Text" @bind:event="oninput" @bind:after="TextChanged" @ref="_firstInput" />
+                    }
+                    break;
+
+                case FilterKind.Number:
+                    <select class="bz-input" @bind="_f.Operator">
+                        @foreach (var op in Enum.GetValues<CompareOperator>())
+                        {
+                            <option value="@op">@Label(op, false)</option>
+                        }
+                    </select>
+                    @if (_f.Operator is not (CompareOperator.Empty or CompareOperator.NotEmpty))
+                    {
+                        <input class="bz-input" type="number" step="any" placeholder="Value" @bind="_f.Number" @bind:event="oninput" @ref="_firstInput" />
+                        @if (_f.Operator == CompareOperator.Between)
+                        {
+                            <input class="bz-input" type="number" step="any" placeholder="and" @bind="_f.Number2" @bind:event="oninput" />
+                        }
+                    }
+                    break;
+
+                case FilterKind.Date:
+                    <select class="bz-input" @bind="_f.Operator">
+                        @foreach (var op in Enum.GetValues<CompareOperator>())
+                        {
+                            <option value="@op">@Label(op, true)</option>
+                        }
+                    </select>
+                    @if (_f.Operator is not (CompareOperator.Empty or CompareOperator.NotEmpty))
+                    {
+                        <input class="bz-input" type="date" @bind="_f.Date" @bind:format="yyyy-MM-dd" @ref="_firstInput" />
+                        @if (_f.Operator == CompareOperator.Between)
+                        {
+                            <input class="bz-input" type="date" @bind="_f.Date2" @bind:format="yyyy-MM-dd" />
+                        }
+                    }
+                    break;
+
+                case FilterKind.MultiSelect:
+                    <input class="bz-input" placeholder="Search values…" @bind="_search" @bind:event="oninput" @ref="_firstInput" />
+                    @if (_values is null)
+                    {
+                        <div class="bz-muted bz-pad">Loading values…</div>
+                    }
+                    else
+                    {
+                        var shown = Matching().Take(MaxShown).ToList();
+                        int matchCount = Matching().Count();
+                        <label class="bz-check bz-check-all">
+                            <input type="checkbox" checked="@(shown.Count > 0 && Matching().All(v => _sel.Contains(v.T)))" @onchange="ToggleAll" />
+                            <span>(Select all@(string.IsNullOrEmpty(_search) ? "" : " matching"))</span>
+                        </label>
+                        <div class="bz-mlist">
+                            @foreach (var v in shown)
+                            {
+                                var val = v.T;
+                                <label class="bz-check">
+                                    <input type="checkbox" checked="@_sel.Contains(val)" @onchange="e => Toggle(val, e.Value is true)" />
+                                    <span class="bz-mval">@(val.Length == 0 ? "(Blank)" : val)</span>
+                                    @if (v.C > 0)
+                                    {
+                                        <span class="bz-cnt">@v.C.ToString("N0")</span>
+                                    }
+                                </label>
+                            }
+                            @if (matchCount > MaxShown)
+                            {
+                                <div class="bz-muted bz-pad">+@((matchCount - MaxShown).ToString("N0")) more — refine the search</div>
+                            }
+                        </div>
+                    }
+                    break;
+            }
+            <div class="bz-menu-actions">
+                <button type="button" class="bz-mbtn" @onclick="ClearFilter">Clear filter</button>
+                <button type="button" class="bz-mbtn bz-primary" @onclick="ApplyFilter">Apply</button>
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    private const int MaxShown = 400;
+
+    [Parameter] public BzGrid<TItem> Grid { get; set; } = default!;
+    [Parameter] public ColumnModel<TItem> Column { get; set; } = default!;
+    [Parameter] public double X { get; set; }
+    [Parameter] public double Y { get; set; }
+
+    private ElementReference _el;
+    private ElementReference _firstInput;
+    private ColumnFilter _f = new();
+    private List<DistinctValue>? _values;
+    private HashSet<string> _sel = new(StringComparer.Ordinal);
+    private string? _search;
+    private CancellationTokenSource? _debounce;
+
+    private bool _showOrder;
+    private List<string> _order = new();
+    private int _dragIndex = -1, _overIndex = -1;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var existing = Grid.FilterFor(Column);
+        _f = existing?.Clone() ?? new ColumnFilter { Field = Column.Key, Kind = Column.Kind };
+        _f.Kind = Column.Kind;
+        _showOrder = Grid.IsGrouped(Column) && Grid.HasUserGroupOrder(Column);
+        if ((Column.CanFilter && Column.Kind == FilterKind.MultiSelect) || _showOrder) await LoadValuesAsync();
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender && Grid.Module is not null)
+        {
+            await Grid.Module.InvokeVoidAsync("clampMenu", _el);
+            try { if (_firstInput.Context is not null) await _firstInput.FocusAsync(); } catch { /* element may not exist */ }
+        }
+    }
+
+    private async Task LoadValuesAsync()
+    {
+        if (_values is not null) return;
+        _values = await Grid.GetDistinctValuesAsync(Column);
+        var existing = Grid.FilterFor(Column);
+        _sel = existing?.Values is { } vals
+            ? new HashSet<string>(vals, StringComparer.Ordinal)
+            : new HashSet<string>(_values.Select(v => v.T), StringComparer.Ordinal);
+        BuildOrder();
+    }
+
+    private void BuildOrder()
+    {
+        var present = _values!.Select(v => v.T).ToList();
+        var preset = Grid.EffectiveGroupOrder(Column) ?? Array.Empty<string>();
+        var seen = new HashSet<string>(StringComparer.Ordinal);
+        _order = new List<string>();
+        foreach (var v in preset) if (seen.Add(v)) _order.Add(v);
+        foreach (var v in present) if (seen.Add(v)) _order.Add(v);
+    }
+
+    private static string Btn(bool on) => on ? "bz-mbtn bz-on" : "bz-mbtn";
+
+    private async Task Do(Task t)
+    {
+        await t;
+        Close();
+    }
+
+    private void Close()
+    {
+        _debounce?.Cancel();
+        Grid.CloseMenu();
+    }
+
+    private async Task OnKey(KeyboardEventArgs e)
+    {
+        if (e.Key == "Escape") Close();
+        else if (e.Key == "Enter" && Column.Kind != FilterKind.MultiSelect) await ApplyFilter();
+    }
+
+    // ---- group order
+
+    private async Task ToggleGroupOrder()
+    {
+        _showOrder = !_showOrder;
+        if (_showOrder) await LoadValuesAsync();
+    }
+
+    private void Move(int i, int delta)
+    {
+        int j = i + delta;
+        if (j < 0 || j >= _order.Count) return;
+        (_order[i], _order[j]) = (_order[j], _order[i]);
+    }
+
+    private void DropOn(int target)
+    {
+        if (_dragIndex < 0 || _dragIndex == target) { _dragIndex = _overIndex = -1; return; }
+        var v = _order[_dragIndex];
+        _order.RemoveAt(_dragIndex);
+        _order.Insert(target, v);
+        _dragIndex = _overIndex = -1;
+    }
+
+    private async Task SaveGroupOrder()
+    {
+        await Grid.SetGroupOrderAsync(Column, _order.ToList());
+        Close();
+    }
+
+    private async Task ResetGroupOrder()
+    {
+        await Grid.SetGroupOrderAsync(Column, null);
+        BuildOrder();
+    }
+
+    // ---- filters
+
+    private IEnumerable<DistinctValue> Matching() =>
+        string.IsNullOrEmpty(_search)
+            ? _values!
+            : _values!.Where(v => v.T.Contains(_search, StringComparison.OrdinalIgnoreCase));
+
+    private void Toggle(string v, bool on)
+    {
+        if (on) _sel.Add(v); else _sel.Remove(v);
+    }
+
+    private void ToggleAll(ChangeEventArgs e)
+    {
+        bool on = e.Value is true;
+        foreach (var v in Matching()) { if (on) _sel.Add(v.T); else _sel.Remove(v.T); }
+    }
+
+    private async Task TextChanged()
+    {
+        _debounce?.Cancel();
+        var cts = _debounce = new CancellationTokenSource();
+        try { await Task.Delay(220, cts.Token); }
+        catch (TaskCanceledException) { return; }
+        await Grid.SetFilterAsync(Column, _f.Clone());
+    }
+
+    private async Task ApplyFilter()
+    {
+        _debounce?.Cancel();
+        ColumnFilter? f = _f.Clone();
+        if (Column.Kind == FilterKind.MultiSelect)
+        {
+            f.Values = _values is not null && _values.All(v => _sel.Contains(v.T)) ? null : _sel.ToList();
+        }
+        await Grid.SetFilterAsync(Column, f.IsActive ? f : null);
+        Close();
+    }
+
+    private async Task ClearFilter()
+    {
+        _debounce?.Cancel();
+        await Grid.SetFilterAsync(Column, null);
+        Close();
+    }
+
+    private static string Label(TextOperator op) => op switch
+    {
+        TextOperator.Contains => "Contains",
+        TextOperator.NotContains => "Does not contain",
+        TextOperator.Equals => "Equals",
+        TextOperator.NotEquals => "Does not equal",
+        TextOperator.StartsWith => "Starts with",
+        TextOperator.EndsWith => "Ends with",
+        TextOperator.Empty => "Is blank",
+        TextOperator.NotEmpty => "Is not blank",
+        _ => op.ToString()
+    };
+
+    private static string Label(CompareOperator op, bool date) => op switch
+    {
+        CompareOperator.Equals => date ? "On" : "=",
+        CompareOperator.NotEquals => date ? "Not on" : "≠",
+        CompareOperator.GreaterThan => date ? "After" : ">",
+        CompareOperator.GreaterOrEqual => date ? "On or after" : "≥",
+        CompareOperator.LessThan => date ? "Before" : "<",
+        CompareOperator.LessOrEqual => date ? "On or before" : "≤",
+        CompareOperator.Between => "Between",
+        CompareOperator.Empty => "Is blank",
+        CompareOperator.NotEmpty => "Is not blank",
+        _ => op.ToString()
+    };
+
+    public void Dispose() => _debounce?.Cancel();
+}

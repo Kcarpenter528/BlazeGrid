@@ -1,0 +1,35 @@
+@namespace BlazeGrid.Internal
+@typeparam TItem
+
+@{
+    int page = Grid.PageIndex, pages = Grid.PageCount, size = Grid.CurrentPageSize;
+    int from = Math.Max(0, page - 2), to = Math.Min(pages - 1, from + 4);
+    from = Math.Max(0, to - 4);
+}
+<div class="bz-pager">
+    <div class="bz-pager-nav">
+        <button type="button" class="bz-pbtn" disabled="@(page == 0)" title="First page" @onclick="() => Grid.SetPageAsync(0)">«</button>
+        <button type="button" class="bz-pbtn" disabled="@(page == 0)" title="Previous page" @onclick="() => Grid.SetPageAsync(page - 1)">‹</button>
+        @for (int p = from; p <= to; p++)
+        {
+            var target = p;
+            <button type="button" class="@(p == page ? "bz-pbtn bz-on" : "bz-pbtn")" @onclick="() => Grid.SetPageAsync(target)">@(p + 1)</button>
+        }
+        <button type="button" class="bz-pbtn" disabled="@(page >= pages - 1)" title="Next page" @onclick="() => Grid.SetPageAsync(page + 1)">›</button>
+        <button type="button" class="bz-pbtn" disabled="@(page >= pages - 1)" title="Last page" @onclick="() => Grid.SetPageAsync(pages - 1)">»</button>
+    </div>
+    <label class="bz-pager-size">
+        <select @onchange="e => Grid.SetPageSizeAsync(int.Parse((string)e.Value!))">
+            @foreach (var s in Grid.PageSizeOptions)
+            {
+                <option value="@s" selected="@(s == size)">@s</option>
+            }
+        </select>
+        per page
+    </label>
+    <span class="bz-pager-info">Page @((page + 1).ToString("N0")) of @pages.ToString("N0") · @Grid.TotalItemCount.ToString("N0") rows</span>
+</div>
+
+@code {
+    [Parameter] public BzGrid<TItem> Grid { get; set; } = default!;
+}

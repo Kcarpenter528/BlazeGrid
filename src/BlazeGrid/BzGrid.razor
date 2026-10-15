@@ -1,0 +1,102 @@
+@typeparam TItem
+@attribute [CascadingTypeParameter(nameof(TItem))]
+
+<div @ref="_root" class="@RootCss" style="@_rootStyle" role="grid" aria-rowcount="@TotalItemCount">
+    <CascadingValue Value="this" IsFixed="true">@ChildContent</CascadingValue>
+
+    @if (ShowGroupPanel)
+    {
+        <div class="bz-group-panel" data-bz-groups>
+            @if (_groups.Count == 0)
+            {
+                <span class="bz-group-hint">Drag a column header here to group by that column</span>
+            }
+            else
+            {
+                @for (int gi = 0; gi < _groups.Count; gi++)
+                {
+                    var g = _groups[gi];
+                    var gcol = FindColumn(g.Field);
+                    if (gcol is null) continue;
+                    if (gi > 0) { <span class="bz-chip-sep">›</span> }
+                    <span class="bz-chip">
+                        <button type="button" class="bz-chip-label" title="Toggle group direction" @onclick="() => ToggleGroupDirectionAsync(g.Field)">
+                            @gcol.Title <span class="bz-chip-dir">@(g.Direction == SortDirection.Ascending ? "▲" : "▼")</span>
+                        </button>
+                        @if (gi > 0)
+                        {
+                            <button type="button" class="bz-chip-btn" title="Move left" @onclick="() => MoveGroupAsync(g.Field, -1)">‹</button>
+                        }
+                        <button type="button" class="bz-chip-btn" title="Remove grouping" @onclick="() => UngroupAsync(g.Field)">✕</button>
+                    </span>
+                }
+                <span class="bz-group-tools">
+                    <button type="button" class="bz-link" @onclick="() => SetAllGroupsCollapsed(false)">Expand all</button>
+                    <button type="button" class="bz-link" @onclick="() => SetAllGroupsCollapsed(true)">Collapse all</button>
+                </span>
+            }
+        </div>
+    }
+
+    @if (EditError is not null)
+    {
+        <div class="bz-edit-error" role="alert">@EditError</div>
+    }
+
+    <div @ref="_scroller" class="bz-scroller" tabindex="-1">
+        <div class="bz-header" role="row">
+            @foreach (var col in _visible)
+            {
+                var sort = SortFor(col);
+                var filter = FilterFor(col);
+                <div class="@col.HeaderCss" style="@col.HeaderStyle" role="columnheader"
+                     data-key="@col.Key" data-w="@((int)Math.Round(col.Width))" data-minw="@((int)col.Def.MinWidth)"
+                     data-lock="@(col.Lock == ColumnLock.Left ? "l" : col.Lock == ColumnLock.Right ? "r" : "n")"
+                     data-grp="@(col.CanGroup ? "1" : "0")"
+                     draggable="@(col.CanReorder ? "true" : "false")"
+                     aria-sort="@(sort is null ? "none" : sort.Direction == SortDirection.Ascending ? "ascending" : "descending")">
+                    <span class="@(col.CanSort ? "bz-htext bz-sortable" : "bz-htext")" title="@col.Title" @onclick="e => HeaderClickAsync(col, e)">@col.Title</span>
+                    @if (sort is not null)
+                    {
+                        <span class="bz-sort">@(sort.Direction == SortDirection.Ascending ? "▲" : "▼")@(SortCount > 1 ? (SortIndex(col) + 1).ToString() : "")</span>
+                    }
+                    @if (col.HasMenu)
+                    {
+                        <button type="button" class="@(filter is not null ? "bz-hbtn bz-active" : "bz-hbtn")" title="Column menu" @onclick="e => OpenMenu(col, e)">
+                            <svg viewBox="0 0 16 16" width="12" height="12" aria-hidden="true"><path d="M2 3h12l-4.5 5.5V13l-3 1.5V8.5z" fill="currentColor" /></svg>
+                        </button>
+                    }
+                    @if (col.CanResize)
+                    {
+                        <div class="bz-resizer" title="Drag to resize, double-click to fit"></div>
+                    }
+                </div>
+            }
+        </div>
+        <GridBody TItem="TItem" Grid="this" @ref="_body" />
+    </div>
+
+    @if (_pageSize > 0)
+    {
+        <GridPager TItem="TItem" Grid="this" />
+    }
+
+    @if (IsLoading)
+    {
+        <div class="@(string.IsNullOrEmpty(LoadingClass) ? "bz-loading" : "bz-loading " + LoadingClass)">
+            @if (LoadingTemplate is not null)
+            {
+                @LoadingTemplate
+            }
+            else
+            {
+                <div class="bz-loading-box"><div class="bz-spinner"></div><span>@LoadingText</span></div>
+            }
+        </div>
+    }
+
+    @if (_menuColumn is not null)
+    {
+        <ColumnMenu TItem="TItem" Grid="this" Column="_menuColumn" X="_menuX" Y="_menuY" @key="_menuColumn" />
+    }
+</div>

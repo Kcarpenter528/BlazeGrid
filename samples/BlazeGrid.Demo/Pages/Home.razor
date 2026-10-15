@@ -1,0 +1,136 @@
+@page "/"
+@using BlazeGrid.Demo.Shared
+
+<PageTitle>BlazeGrid · Local data</PageTitle>
+
+<section class="toolbar">
+    <div class="group">
+        <span class="label">Load</span>
+        @foreach (var n in new[] { 1_000, 10_000, 100_000, 250_000, 500_000 })
+        {
+            var count = n;
+            <button class="@(count == _count ? "btn on" : "btn")" @onclick="() => Load(count)">@(count >= 1000 ? $"{count / 1000:N0}k" : count.ToString())</button>
+        }
+    </div>
+    <div class="group">
+        <span class="label">Engine</span>
+        <select @bind="_engine" @bind:after="() => Load(_count)">
+            <option value="@DataEngineMode.Auto">Auto</option>
+            <option value="@DataEngineMode.Managed">Managed (.NET)</option>
+            <option value="@DataEngineMode.Worker">Web Worker</option>
+        </select>
+    </div>
+    <div class="group">
+        <span class="label">Paging</span>
+        <select @bind="_pageSize">
+            <option value="0">Off (virtual)</option>
+            <option value="100">100</option>
+            <option value="1000">1000</option>
+        </select>
+    </div>
+    <div class="group">
+        <label class="check"><input type="checkbox" @bind="_dark" /> Dark</label>
+        <label class="check"><input type="checkbox" @bind="_compact" /> Compact</label>
+        <button class="btn" @onclick="() => _grid!.ResetStateAsync()">Reset layout</button>
+    </div>
+</section>
+
+<section class="stats">
+    @if (_stats is not null)
+    {
+        <div class="stat"><b>@_stats.Rows.ToString("N0")</b><span>rows in view</span></div>
+        <div class="stat"><b>@_stats.QueryMs.ToString("N1") ms</b><span>query (@_stats.Engine)</span></div>
+        <div class="stat"><b>@_stats.DomMs.ToString("N1") ms</b><span>data → DOM</span></div>
+        <div class="stat hi"><b>@_stats.PaintMs.ToString("N1") ms</b><span>data → painted</span></div>
+    }
+    <div class="stat"><b>@_genMs.ToString("N0") ms</b><span>generating test data (not grid)</span></div>
+</section>
+
+<BzGrid @ref="_grid" @key="_pageSize" TItem="Order" Items="_orders" StateKey="demo-orders" Height="calc(100vh - 290px)"
+        Engine="_engine" PageSize="_pageSize" Theme="@ThemeName" ShowEditCommands="true"
+        OnRenderStats="s => _stats = s" OnFilterChanged="FilterChanged" OnRowUpdated="RowUpdated"
+        OnRowEditCommit="ValidateEdit" RowClass="RowCss">
+    <BzColumn Field="Id" Title="#" Locked="ColumnLock.Left" Editable="false" Format="N0" />
+    <BzColumn Field="Customer" Locked="ColumnLock.Left" Filter="FilterKind.MultiSelect" />
+    <BzColumn Field="Region" Filter="FilterKind.MultiSelect" />
+    <BzColumn Field="Product" />
+    <BzColumn Field="Status" GroupOrder="StatusOrder">
+        <Template>
+            <StatusBadge Status="context.Status" />
+        </Template>
+    </BzColumn>
+    <BzColumn TItem="Order" Field="Priority" Filter="FilterKind.MultiSelect" GroupOrder="PriorityOrder" CellClassSelector="PriorityCss" />
+    <BzColumn Field="OrderDate" Title="Order date" Format="yyyy-MM-dd" />
+    <BzColumn Field="ShipDate" Title="Shipped" Format="yyyy-MM-dd" />
+    <BzColumn Field="Quantity" Title="Qty" />
+    <BzColumn Field="UnitPrice" Title="Unit price" Format="C2" />
+    <BzColumn Field="Amount" Format="C2" Editable="false" />
+    <BzColumn Field="Discount" Format="P1" />
+    <BzColumn Field="Paid" />
+    <BzColumn Field="SalesRep" Title="Rep" HtmlTemplate="@RepTemplate" />
+    <BzColumn Field="Notes" />
+</BzGrid>
+
+<section class="log">
+    <b>Events</b>
+    @foreach (var l in _log)
+    {
+        <div>@l</div>
+    }
+</section>
+
+@code {
+    private BzGrid<Order>? _grid;
+    private Order[]? _orders;
+    private int _count;
+    private DataEngineMode _engine = DataEngineMode.Auto;
+    private int _pageSize;
+    private bool _dark, _compact;
+    private GridRenderStats? _stats;
+    private double _genMs;
+    private readonly List<string> _log = new();
+
+    private string? ThemeName => _dark && _compact ? "dark bz-theme-compact" : _dark ? "dark" : _compact ? "compact" : null;
+
+    private static readonly string[] StatusOrder = { "New", "Processing", "OnHold", "Shipped", "Delivered", "Cancelled" };
+
+    protected override void OnInitialized() => Load(100_000);
+
+    private void Load(int count)
+    {
+        var sw = System.Diagnostics.Stopwatch.StartNew();
+        _orders = OrderGenerator.Create(count, seed: count);
+        _genMs = sw.Elapsed.TotalMilliseconds;
+        _count = count;
+    }
+
+    private void Log(string s)
+    {
+        _log.Insert(0, $"{DateTime.Now:HH:mm:ss}  {s}");
+        if (_log.Count > 6) _log.RemoveAt(_log.Count - 1);
+    }
+
+    private void FilterChanged(FilterChangedEventArgs e) =>
+        Log($"OnFilterChanged: {e.Field} → {e.Filters.Count} active filter(s)");
+
+    private void ValidateEdit(RowEditCommitEventArgs<Order> e)
+    {
+        if (e.Changes.TryGetValue(nameof(Order.Quantity), out var q) && q.NewValue is int i && i <= 0)
+        {
+            e.Cancel = true;
+            e.Error = "Quantity must be greater than zero.";
+        }
+    }
+
+    private void RowUpdated(RowEditCommitEventArgs<Order> e)
+    {
+        if (e.Changes.ContainsKey(nameof(Order.Quantity)) || e.Changes.ContainsKey(nameof(Order.UnitPrice)))
+            e.Item.Amount = e.Item.Quantity * e.Item.UnitPrice;
+        Log($"OnRowUpdated #{e.Item.Id}: " + string.Join(", ", e.Changes.Values.Select(c => $"{c.Field} {c.OldValue} → {c.NewValue}")));
+    }
+
+    private static readonly string[] PriorityOrder = { "Critical", "High", "Normal", "Low" };
+    private const string RepTemplate = "<span class='rep'>{{SalesRep}}</span> <small>#{{Id}}</small>";
+    private static string? RowCss(Order o) => o.Status == OrderStatus.Cancelled ? "row-cancelled" : null;
+    private static string? PriorityCss(Order o) => o.Priority == "Critical" ? "cell-critical" : null;
+}

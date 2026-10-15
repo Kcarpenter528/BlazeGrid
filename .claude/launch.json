@@ -1,0 +1,31 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "blazegrid-demo",
+      "runtimeExecutable": "dotnet",
+      "runtimeArgs": [
+        "run",
+        "--project",
+        "samples/BlazeGrid.Demo",
+        "--urls",
+        "http://localhost:5178"
+      ],
+      "port": 5178
+    },
+    {
+      "name": "blazegrid-demo-release",
+      "runtimeExecutable": "dotnet",
+      "runtimeArgs": [
+        "run",
+        "-c",
+        "Release",
+        "--project",
+        "samples/BlazeGrid.Demo",
+        "--urls",
+        "http://localhost:5179"
+      ],
+      "port": 5179
+    }
+  ]
+}
